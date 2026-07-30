@@ -1,0 +1,6 @@
+# Vendored engine/library files (downloaded at deploy time or via get-engine.sh)
+engine/stockfish-16.1-lite-single.js
+engine/stockfish-16.1-lite-single.wasm
+vendor/chess.js
+node_modules/
+.DS_Store

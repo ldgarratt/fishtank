@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FishTank — emotionally unstable Stockfish variants</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80'>🐟</text></svg>" />
+</head>
+<body>
+  <header>
+    <h1>🐟 FishTank</h1>
+    <p class="subtitle">Real Stockfish, but emotionally unstable. Pick your opponent.</p>
+    <div id="engine-status" class="engine-status">Loading engine…</div>
+  </header>
+
+  <!-- Variant picker -->
+  <main id="picker">
+    <div id="variant-cards" class="cards"></div>
+    <div class="side-row">
+      <label for="side-select">Play as:</label>
+      <select id="side-select">
+        <option value="w" selected>White</option>
+        <option value="b">Black</option>
+      </select>
+    </div>
+  </main>
+
+  <!-- Game view -->
+  <main id="game" class="hidden">
+    <div class="game-layout">
+      <div class="board-col">
+        <div class="opponent-bar">
+          <span id="mood" class="mood">🤖</span>
+          <div class="opp-text">
+            <div id="opp-name" class="opp-name"></div>
+            <div id="opp-tagline" class="opp-tagline"></div>
+          </div>
+        </div>
+        <div class="elo-wrap">
+          <div class="elo-track"><div id="elo-bar" class="elo-bar"></div></div>
+          <div class="elo-label">Current Elo: <span id="elo-value">?</span></div>
+        </div>
+        <div id="board" class="board"></div>
+        <div id="status" class="status"></div>
+        <div class="controls">
+          <button id="btn-undo">↩️ Undo</button>
+          <button id="btn-new">🔄 New game</button>
+          <button id="btn-switch">🐟 Switch fish</button>
+        </div>
+      </div>
+      <div class="log-col">
+        <h2>Feed</h2>
+        <div id="log" class="log"></div>
+      </div>
+    </div>
+  </main>
+
+  <footer>
+    <p>
+      Powered by real <a href="https://stockfishchess.org/" target="_blank" rel="noopener">Stockfish</a>
+      (GPLv3) with its strength limiter abused for comedy.
+      Chess rules by <a href="https://github.com/jhlywa/chess.js" target="_blank" rel="noopener">chess.js</a>.
+    </p>
+  </footer>
+
+  <script>
+    // Sequential script loader with local-first, CDN-fallback for chess.js.
+    (function () {
+      function load(srcs, then) {
+        if (!srcs.length) { console.error('All sources failed'); return; }
+        var s = document.createElement('script');
+        s.src = srcs[0];
+        s.onload = then;
+        s.onerror = function () { load(srcs.slice(1), then); };
+        document.body.appendChild(s);
+      }
+      function chain(groups) {
+        if (!groups.length) return;
+        load(groups[0], function () { chain(groups.slice(1)); });
+      }
+      chain([
+        ['vendor/chess.js', 'https://cdn.jsdelivr.net/npm/chess.js@0.13.4/chess.js'],
+        ['js/variants.js'],
+        ['js/engine.js'],
+        ['js/app.js'],
+      ]);
+    })();
+  </script>
+</body>
+</html>
