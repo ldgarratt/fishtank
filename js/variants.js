@@ -5,17 +5,22 @@
  * Elo model:
  *   - Real Stockfish supports UCI_LimitStrength + UCI_Elo in [1320, 3190].
  *   - We track an unbounded "effective elo". Within range it maps straight to
- *     UCI_Elo. Below 1320 the engine stays at 1320 but gains an increasing
- *     probability of playing a completely random legal move instead.
+ *     UCI_Elo. Below 1320 the app switches to Skill Level + shallow fixed
+ *     search depth (see engine.js), which plays like a genuinely weak human.
+ *     Only far below the floor does a small random-move chance kick in.
  */
 
 const ELO_MIN = 1320;
 const ELO_MAX = 3190;
 
-/** Probability of a totally random move when effective elo is below the engine floor. */
+/**
+ * Small residual chance of a totally random move at very low effective Elo.
+ * Skill Level + depth limiting (engine.js) do most of the weakening; this
+ * only adds occasional chaos below ~700 to mimic true-beginner howlers.
+ */
 function randomMoveProbability(effectiveElo) {
-  if (effectiveElo >= ELO_MIN) return 0;
-  return Math.min(0.9, (ELO_MIN - effectiveElo) / 900);
+  if (effectiveElo >= 700) return 0;
+  return Math.min(0.3, ((700 - effectiveElo) / 700) * 0.3);
 }
 
 function clampUciElo(effectiveElo) {
@@ -29,6 +34,8 @@ function clampUciElo(effectiveElo) {
  *   onEngineTurnStart(state, game)       -> before the engine thinks; may return event strings
  *   onEngineMovePlayed(state, move, game)-> after the engine's move; may return event strings
  *   extraRandomChance(state, game)       -> additional probability [0,1] of a random move
+ *   checkCustomEnd(state, game)          -> return { winner: 'player'|'engine'|'draw', msg }
+ *                                           to end the game with a custom rule
  *
  * state = { elo, moveCount, playerColor, ...variant scratch }
  */
@@ -192,6 +199,44 @@ const VARIANTS = {
         return [
           `🕊️ It captured your ${pieceName(move.captured)}: −300 Elo → ${state.elo}`,
         ];
+      }
+    },
+  },
+
+  threecheckfish: {
+    id: 'threecheckfish',
+    name: 'ThreeCheckFish',
+    emoji: '✅',
+    tagline: 'Three-check rules: whoever gives three checks first wins.',
+    description:
+      'Plays at a fixed 2200 Elo under three-check rules: the first side to ' +
+      'deliver three checks wins, checkmate also counts. It plays normal ' +
+      'chess and does not understand the rule — exploit that.',
+    baseElo: 2200,
+    demo: [['♗b5+', '✓', '+1'], ['♕h5+', '✓✓', '+1'], ['♖e8+', '✓✓✓', 'win']],
+    art: { acc: [['✅', 32, 6, 1.3, 0], ['✅', 20, 16, 1.3, 0], ['✅', 8, 26, 1.3, 0]] },
+    init(state) {
+      state.playerChecks = 0;
+      state.engineChecks = 0;
+    },
+    onPlayerMove(state, move, game) {
+      if (game.in_check()) {
+        state.playerChecks += 1;
+        return [`✅ Check ${state.playerChecks}/3 for you`];
+      }
+    },
+    onEngineMovePlayed(state, move, game) {
+      if (game.in_check()) {
+        state.engineChecks += 1;
+        return [`⚠️ Check ${state.engineChecks}/3 for ThreeCheckFish`];
+      }
+    },
+    checkCustomEnd(state) {
+      if (state.playerChecks >= 3) {
+        return { winner: 'player', msg: '🏆 Three checks — you win!' };
+      }
+      if (state.engineChecks >= 3) {
+        return { winner: 'engine', msg: '💀 ThreeCheckFish delivered three checks — it wins.' };
       }
     },
   },

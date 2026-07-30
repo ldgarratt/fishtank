@@ -44,6 +44,7 @@ class SillyEngine {
     this.sourceName = null;
     this.listeners = [];
     this.lastElo = null;
+    this.weakDepth = null;
   }
 
   _spawnLocal(src) {
@@ -140,11 +141,29 @@ class SillyEngine {
     this.send('isready');
   }
 
-  setStrength(uciElo) {
-    if (uciElo === this.lastElo) return;
-    this.lastElo = uciElo;
-    this.send('setoption name UCI_LimitStrength value true');
-    this.send('setoption name UCI_Elo value ' + uciElo);
+  /**
+   * Map an effective Elo to engine settings.
+   *  - 1320..3190: Stockfish's own limiter (UCI_LimitStrength + UCI_Elo).
+   *  - below 1320: the limiter can't go lower, so we approximate club/beginner
+   *    play with Skill Level (adds move randomization) plus a shallow fixed
+   *    search depth — depth 1-2 plays greedy, short-sighted chess like a
+   *    real low-rated player rather than a coin-flipping one.
+   */
+  setStrength(effectiveElo) {
+    const elo = Math.round(effectiveElo);
+    if (elo === this.lastElo) return;
+    this.lastElo = elo;
+    if (elo >= 1320) {
+      this.weakDepth = null;
+      this.send('setoption name Skill Level value 20');
+      this.send('setoption name UCI_LimitStrength value true');
+      this.send('setoption name UCI_Elo value ' + Math.min(3190, elo));
+    } else {
+      this.send('setoption name UCI_LimitStrength value false');
+      const skill = Math.max(0, Math.round(((elo - 100) / 1220) * 10)); // ~100->0, 1320->10
+      this.send('setoption name Skill Level value ' + skill);
+      this.weakDepth = elo < 400 ? 1 : elo < 700 ? 2 : elo < 1000 ? 3 : elo < 1200 ? 4 : 5;
+    }
   }
 
   /** Ask for the best move from a FEN. Resolves with a UCI move string like "e2e4" or "e7e8q". */
@@ -158,7 +177,7 @@ class SillyEngine {
       };
       this.onLine(handler);
       this.send('position fen ' + fen);
-      this.send('go movetime ' + movetimeMs);
+      this.send(this.weakDepth ? 'go depth ' + this.weakDepth : 'go movetime ' + movetimeMs);
     });
   }
 }

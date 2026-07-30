@@ -78,7 +78,8 @@ console.log('RageFish');
   const v = VARIANTS.ragefish;
   const s = { elo: v.baseElo, moveCount: 0 };
   assert(v.baseElo === 200, 'starts at 200 Elo (way below engine floor)');
-  assert(randomMoveProbability(v.baseElo) === 0.9, 'starts mostly-random (90%)');
+  const p200 = randomMoveProbability(200);
+  assert(p200 > 0.2 && p200 < 0.3, 'small random-move chance at 200 (' + p200.toFixed(3) + ')');
   v.onPlayerMove(s, capture, notInCheck);
   assert(s.elo === 400, 'capture enrages +200');
   for (let i = 0; i < 50; i++) v.onPlayerMove(s, capture, notInCheck);
@@ -144,11 +145,29 @@ console.log('CowardFish');
   assert(s.elo === 3190, 'recovers when its half clears');
 }
 
+console.log('ThreeCheckFish');
+{
+  const v = VARIANTS.threecheckfish;
+  const s = { elo: v.baseElo, moveCount: 0 };
+  v.init(s);
+  assert(v.checkCustomEnd(s) === undefined, 'no winner at start');
+  v.onPlayerMove(s, quiet, inCheck);
+  v.onPlayerMove(s, quiet, inCheck);
+  assert(v.checkCustomEnd(s) === undefined, 'two checks is not enough');
+  v.onPlayerMove(s, quiet, inCheck);
+  assert(v.checkCustomEnd(s).winner === 'player', 'three player checks wins');
+  v.init(s);
+  v.onEngineMovePlayed(s, quiet, inCheck);
+  v.onEngineMovePlayed(s, quiet, inCheck);
+  v.onEngineMovePlayed(s, quiet, inCheck);
+  assert(v.checkCustomEnd(s).winner === 'engine', 'three engine checks loses');
+}
+
 console.log('Random-move probability model');
 {
   assert(randomMoveProbability(ELO_MIN) === 0, 'no random moves at engine floor');
-  assert(Math.abs(randomMoveProbability(ELO_MIN - 450) - 0.5) < 1e-9, '50% at floor - 450');
-  assert(randomMoveProbability(0) === 0.9, 'capped at 90%');
+  assert(randomMoveProbability(700) === 0, 'no random moves at 700+ (depth/skill handle it)');
+  assert(randomMoveProbability(0) === 0.3, 'capped at 30%');
   assert(clampUciElo(99999) === ELO_MAX, 'clamp upper');
   assert(clampUciElo(-5) === ELO_MIN, 'clamp lower');
 }

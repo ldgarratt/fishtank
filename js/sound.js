@@ -8,7 +8,6 @@
 const SOUND_FILES = {
   move: 'Move.mp3',
   capture: 'Capture.mp3',
-  check: 'Check.mp3',
   start: 'GenericNotify.mp3',
   victory: 'Victory.mp3',
   defeat: 'Defeat.mp3',
@@ -16,7 +15,7 @@ const SOUND_FILES = {
 };
 const SOUND_CDN =
   'https://raw.githubusercontent.com/lichess-org/lila/master/public/sound/standard/';
-const SOUND_FALLBACK = { check: 'capture', victory: 'start', defeat: 'start', draw: 'start' };
+const SOUND_FALLBACK = { victory: 'start', defeat: 'start', draw: 'start' };
 
 class SoundBox {
   constructor() {
@@ -46,8 +45,34 @@ class SoundBox {
     return a;
   }
 
+  /**
+   * Check alert. Lichess has no check sound (their Check.mp3 is literally a
+   * symlink to Silence.mp3), so we synthesize a short rising two-tone chime.
+   */
+  _checkChime() {
+    try {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      this.ctx = this.ctx || new Ctx();
+      if (this.ctx.state === 'suspended') this.ctx.resume();
+      const t = this.ctx.currentTime;
+      const o = this.ctx.createOscillator();
+      const g = this.ctx.createGain();
+      o.type = 'sine';
+      o.frequency.setValueAtTime(740, t);
+      o.frequency.setValueAtTime(988, t + 0.09);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.22, t + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.4);
+      o.connect(g);
+      g.connect(this.ctx.destination);
+      o.start(t);
+      o.stop(t + 0.45);
+    } catch (e) { /* no WebAudio — stay silent */ }
+  }
+
   play(name) {
     if (!this.enabled) return;
+    if (name === 'check') return this._checkChime();
     if (this.dead.has(name)) {
       const fb = SOUND_FALLBACK[name];
       if (!fb || this.dead.has(fb)) return;

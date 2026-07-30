@@ -314,7 +314,8 @@
 
   function afterPlayerMove(move) {
     renderBoard();
-    sound.play(game.in_check() ? 'check' : move.captured ? 'capture' : 'move');
+    sound.play(move.captured ? 'capture' : 'move');
+    if (game.in_check()) sound.play('check');
     logMove('You', move.san);
     const events = (variant.onPlayerMove && variant.onPlayerMove(vstate, move, game)) || [];
     for (const ev of events) logEvent(ev);
@@ -350,9 +351,8 @@
       engineCaptured = !!played.captured;
       logMove(variant.name, san + '  🎲');
     } else {
-      const uciElo = clampUciElo(vstate.elo);
-      engine.setStrength(uciElo);
-      const uci = await engine.bestMove(game.fen(), moveTimeFor(uciElo));
+      engine.setStrength(vstate.elo);
+      const uci = await engine.bestMove(game.fen(), moveTimeFor(clampUciElo(vstate.elo)));
       if (!uci || uci === '(none)') {
         thinking = false;
         checkGameEnd();
@@ -378,7 +378,8 @@
       }
       logMove(variant.name, san);
     }
-    sound.play(game.in_check() ? 'check' : engineCaptured ? 'capture' : 'move');
+    sound.play(engineCaptured ? 'capture' : 'move');
+    if (game.in_check()) sound.play('check');
 
     const engEvents =
       (variant.onEngineMovePlayed && variant.onEngineMovePlayed(vstate, engMove, game)) || [];
@@ -399,6 +400,19 @@
   }
 
   function checkGameEnd() {
+    // Variant-specific win conditions (e.g. three-check) take precedence.
+    if (variant.checkCustomEnd) {
+      const res = variant.checkCustomEnd(vstate, game);
+      if (res) {
+        gameOver = true;
+        premove = null;
+        sound.play(res.winner === 'player' ? 'victory' : res.winner === 'engine' ? 'defeat' : 'draw');
+        setStatus(res.msg);
+        logEvent(res.msg);
+        els.btnRematch.classList.remove('hidden');
+        return true;
+      }
+    }
     if (!game.game_over()) return false;
     gameOver = true;
     let msg;

@@ -1,12 +1,11 @@
 # 🐟 FishTank
 
-**Real Stockfish, but emotionally unstable.**
+Play chess in your browser against Stockfish bots whose strength changes
+mid-game depending on what happens on the board. Check PanicFish and it drops
+200 Elo. Capture against TiltFish and it tilts. Feed RageFish and it wakes up.
 
-A browser chess GUI where you play against genuine Stockfish — except each
-variant has a psychological condition that changes its strength as the game
-unfolds. No engine forks, no installs: the app drives real Stockfish (WASM)
-and abuses its built-in strength limiter (`UCI_LimitStrength` / `UCI_Elo`)
-live, mid-game.
+Every bot is the real Stockfish engine running in WebAssembly — no forks, no
+installs. The app just adjusts the engine's strength settings between moves.
 
 ## The fish
 
@@ -21,6 +20,7 @@ live, mid-game.
 | **SharkFish** | 🦈 | Starts at 1600. **Gains 150 Elo every time it checks YOUR king.** Keep your king safe. |
 | **PacifistFish** | 🕊️ | **Loses 300 Elo every time IT captures one of your pieces.** Bait it into trades. |
 | **CowardFish** | 🙈 | **Loses 100 Elo for each of your pieces on its half of the board.** March forward. |
+| **ThreeCheckFish** | ✅ | Fixed 2200 Elo, but **three-check rules: first side to give three checks wins.** It doesn't know the rule. |
 
 ## Play it
 
@@ -43,16 +43,22 @@ doesn't stream from a CDN:
 bash engine/get-engine.sh
 ```
 
-## How the Elo trickery works
+## How the strength adjustment works
 
-Stockfish exposes `UCI_LimitStrength` + `UCI_Elo` (range **1320–3190**). Each
-variant tracks an *effective Elo* and the app re-sends `UCI_Elo` before every
-engine move. When a variant drops **below 1320** (the engine's floor), the app
-keeps Stockfish at 1320 but adds an increasing probability of substituting a
-completely random legal move — so a fully panicked PanicFish really does play
-like it's having a breakdown. Random moves are marked 🎲 in the move feed.
+Each bot tracks an *effective Elo* that its rules update during the game, and
+the app reconfigures Stockfish before every engine move:
 
-Weaker states also get shorter think times, which keeps games snappy.
+- **1320–3190** — Stockfish's built-in limiter (`UCI_LimitStrength` +
+  `UCI_Elo`) is used directly. This is the engine's supported range.
+- **Below 1320** — the limiter can't go lower, so the app switches to
+  Stockfish's `Skill Level` option (which adds move randomization) combined
+  with a shallow fixed search depth: depth 1–2 at the bottom of the scale.
+  A depth-1 engine plays greedy, short-sighted chess — much closer to a real
+  400-rated player than random moves would be. Far below the floor a small
+  random-move chance (up to 30%) is mixed in; those moves are marked 🎲 in
+  the feed.
+
+Weaker settings also get shorter think times, which keeps games quick.
 
 ## Publishing / deployment
 
@@ -93,8 +99,9 @@ bloodfish: {
 
 Hooks you can use: `onPlayerMove(state, move, game)` (after the human moves),
 `onEngineTurnStart(state, game)` (before the engine thinks),
-`onEngineMovePlayed(state, move, game)` (after the engine's move), and
-`extraRandomChance(state, game)` (probability of a totally random move).
+`onEngineMovePlayed(state, move, game)` (after the engine's move),
+`extraRandomChance(state, game)` (probability of a totally random move), and
+`checkCustomEnd(state, game)` (custom win conditions, e.g. three-check).
 `state.playerColor` tells you which side the human plays.
 `state.elo` is the effective Elo; below 1320 the app automatically converts
 the deficit into random-move probability.

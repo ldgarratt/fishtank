@@ -45,7 +45,7 @@ done
 # Board sounds from lichess's standard set (optional — the app falls back to
 # lichess's GitHub copy, then to silence, so missing files never break it).
 mkdir -p ../sound
-for f in Move.mp3 Capture.mp3 Check.mp3 GenericNotify.mp3 Victory.mp3 Defeat.mp3 Draw.mp3; do
+for f in Move.mp3 Capture.mp3 GenericNotify.mp3 Victory.mp3 Defeat.mp3 Draw.mp3; do
   curl -fsSL -o "../sound/$f" \
     "https://raw.githubusercontent.com/lichess-org/lila/master/public/sound/standard/$f" \
     || { echo "warn: optional sound $f not found"; rm -f "../sound/$f"; }
