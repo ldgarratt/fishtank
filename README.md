@@ -16,7 +16,7 @@ live, mid-game.
 | **TiltFish** | 🤬 | Loses **200 Elo every time you capture a piece**. Trade everything. Watch it crumble. |
 | **TiredFish** | 😴 | Loses **50 Elo every move it plays**. Survive the opening, win the endgame. |
 | **DrunkFish** | 🍺 | Full strength, but a **growing chance each move of playing a completely random move**. |
-| **RageFish** | 😡 | Starts weak. **Gains 200 Elo every time you capture a piece**. Don't take the bait. |
+| **RageFish** | 😡 | Starts at **200 Elo**, playing near-random moves. **Gains 200 Elo every time you capture a piece**. Don't take the bait. |
 | **GamblerFish** | 🎰 | Its Elo **secretly re-rolls every move** — beginner to superhuman. Good luck. |
 
 ## Play it

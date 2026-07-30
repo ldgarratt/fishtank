@@ -115,12 +115,13 @@ const VARIANTS = {
     id: 'ragefish',
     name: 'RageFish',
     emoji: '😡',
-    tagline: 'Gains 200 Elo every time you capture one of its pieces.',
+    tagline: 'Starts at 200 Elo. Gains 200 every time you capture one of its pieces.',
     description:
-      'Starts barely awake. Every piece you take makes it angrier — and much ' +
-      'stronger. How long can you resist taking the bait?',
-    baseElo: ELO_MIN,
-    demo: [['♟xe5', '1520', '+200'], ['♞xc3', '1720', '+200'], ['♝xb2', '1920', '+200']],
+      'Starts basically asleep at 200 Elo, flopping pieces around at random. ' +
+      'Every piece you take makes it angrier — and much stronger. How long can ' +
+      'you resist taking the bait?',
+    baseElo: 200,
+    demo: [['♟xe5', '400', '+200'], ['♞xc3', '600', '+200'], ['♝xb2', '800', '+200']],
     onPlayerMove(state, move) {
       if (move.captured) {
         state.elo = Math.min(ELO_MAX, state.elo + 200);

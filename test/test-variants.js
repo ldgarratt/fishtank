@@ -77,9 +77,10 @@ console.log('RageFish');
 {
   const v = VARIANTS.ragefish;
   const s = { elo: v.baseElo, moveCount: 0 };
-  assert(v.baseElo === ELO_MIN, 'starts at engine floor');
+  assert(v.baseElo === 200, 'starts at 200 Elo (way below engine floor)');
+  assert(randomMoveProbability(v.baseElo) === 0.9, 'starts mostly-random (90%)');
   v.onPlayerMove(s, capture, notInCheck);
-  assert(s.elo === ELO_MIN + 200, 'capture enrages +200');
+  assert(s.elo === 400, 'capture enrages +200');
   for (let i = 0; i < 50; i++) v.onPlayerMove(s, capture, notInCheck);
   assert(s.elo === ELO_MAX, 'rage caps at ' + ELO_MAX);
 }

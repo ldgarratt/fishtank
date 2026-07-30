@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>FishTank — emotionally unstable Stockfish variants</title>
-  <link rel="stylesheet" href="css/style.css?v=4" />
+  <link rel="stylesheet" href="css/style.css?v=5" />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80'>🐟</text></svg>" />
 </head>
 <body>
@@ -39,6 +39,7 @@
         <div id="board" class="board"></div>
         <div id="status" class="status"></div>
         <div class="controls">
+          <button id="btn-rematch" class="primary hidden">⚔️ Rematch</button>
           <button id="btn-undo">↩️ Undo</button>
           <button id="btn-resign">🏳️ Resign</button>
           <button id="btn-new">🔄 New game</button>
@@ -73,6 +74,7 @@
       (GPLv3) with its strength limiter abused for comedy.
       Chess rules by <a href="https://github.com/jhlywa/chess.js" target="_blank" rel="noopener">chess.js</a>.
       Stockfish icon by Klein Maetschke.
+      Chess pieces by Colin M.L. Burnett (CC BY-SA 3.0).
     </p>
   </footer>
 
@@ -95,9 +97,9 @@
         ['vendor/chess.js',
          'https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js',
          'https://cdn.jsdelivr.net/npm/chess.js@0.10.3/chess.js'],
-        ['js/variants.js?v=4'],
-        ['js/engine.js?v=4'],
-        ['js/app.js?v=4'],
+        ['js/variants.js?v=5'],
+        ['js/engine.js?v=5'],
+        ['js/app.js?v=5'],
       ]);
     })();
   </script>

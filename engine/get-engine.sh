@@ -34,5 +34,13 @@ mkdir -p ../img
 curl -fsSL -o ../img/stockfish.png \
   "https://stockfishchess.org/images/logo/icon_128x128@2x.png"
 [ "$(wc -c < ../img/stockfish.png)" -gt 1000 ]
+
+# cburnett SVG chess pieces (Colin M.L. Burnett, CC BY-SA 3.0) via lichess.
+mkdir -p ../img/pieces
+for p in wK wQ wR wB wN wP bK bQ bR bB bN bP; do
+  curl -fsSL -o "../img/pieces/$p.svg" \
+    "https://raw.githubusercontent.com/lichess-org/lila/master/public/piece/cburnett/$p.svg"
+  grep -q "<svg" "../img/pieces/$p.svg"
+done
 echo "Done. Files downloaded:"
 ls -lh stockfish-16.1-lite-single.* ../vendor/chess.js

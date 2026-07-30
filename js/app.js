@@ -2,11 +2,16 @@
 /* global Chess, VARIANTS, randomMoveProbability, clampUciElo, ELO_MIN, ELO_MAX, SillyEngine */
 
 (() => {
-  // Solid glyph pieces — bold, filled, classic look on every platform.
-  const UNICODE = {
-    wk: '♔', wq: '♕', wr: '♖', wb: '♗', wn: '♘', wp: '♙',
-    bk: '♚', bq: '♛', br: '♜', bb: '♝', bn: '♞', bp: '♟',
-  };
+  // cburnett SVG pieces (CC BY-SA 3.0) — same look locally and deployed:
+  // vendored files first, lichess's GitHub copy as automatic fallback.
+  const CDN_PIECE_BASE =
+    'https://raw.githubusercontent.com/lichess-org/lila/master/public/piece/cburnett/';
+  let PIECE_BASE = 'img/pieces/';
+  {
+    const probe = new Image();
+    probe.onerror = () => { PIECE_BASE = CDN_PIECE_BASE; };
+    probe.src = 'img/pieces/wK.svg';
+  }
 
   const els = {
     picker: document.getElementById('picker'),
@@ -24,6 +29,7 @@
     btnSwitch: document.getElementById('btn-switch'),
     btnUndo: document.getElementById('btn-undo'),
     btnResign: document.getElementById('btn-resign'),
+    btnRematch: document.getElementById('btn-rematch'),
     sideSelect: document.getElementById('side-select'),
   };
 
@@ -68,15 +74,21 @@
         `</div>` +
         `<div class="card-name">${v.name}</div>` +
         `<div class="card-tag">${v.tagline}</div>`;
-      card.addEventListener('click', () => startGame(v.id));
+      card.addEventListener('click', () => startGame(v.id, true));
       els.cards.appendChild(card);
     }
   }
 
   /* ---------- game setup ---------- */
 
-  function startGame(variantId) {
+  function startGame(variantId, pushHistory) {
     variant = VARIANTS[variantId];
+    // Each variant gets its own URL (#panicfish etc.) so the browser back
+    // button returns to the picker.
+    if (pushHistory && location.hash !== '#' + variantId) {
+      history.pushState(null, '', '#' + variantId);
+    }
+    els.btnRematch.classList.add('hidden');
     vstate = { elo: variant.baseElo, moveCount: 0 };
     if (variant.init) variant.init(vstate);
     game = new Chess();
@@ -102,9 +114,20 @@
     }
   }
 
-  function backToPicker() {
+  function showPicker() {
     els.game.classList.add('hidden');
     els.picker.classList.remove('hidden');
+  }
+
+  function goToPicker() {
+    if (location.hash) history.pushState(null, '', location.pathname + location.search);
+    showPicker();
+  }
+
+  function applyLocation() {
+    const id = location.hash.slice(1);
+    if (VARIANTS[id]) startGame(id, false);
+    else showPicker();
   }
 
   /* ---------- board rendering ---------- */
@@ -134,10 +157,17 @@
         cell.dataset.sq = sq;
         const piece = game.get(sq);
         if (piece) {
-          const span = document.createElement('span');
-          span.className = 'piece ' + (piece.color === 'w' ? 'white-piece' : 'black-piece');
-          span.textContent = UNICODE[piece.color + piece.type];
-          cell.appendChild(span);
+          const name = piece.color + piece.type.toUpperCase() + '.svg';
+          const img = document.createElement('img');
+          img.className = 'piece-img';
+          img.alt = piece.color + piece.type;
+          img.draggable = false;
+          img.src = PIECE_BASE + name;
+          img.onerror = () => {
+            img.onerror = null;
+            img.src = CDN_PIECE_BASE + name;
+          };
+          cell.appendChild(img);
         }
         if (selectedSquare === sq) cell.classList.add('selected');
         if (legalTargets.has(sq)) cell.classList.add(piece ? 'capture-target' : 'move-target');
@@ -267,6 +297,7 @@
     else msg = '🤝 Draw (50-move rule).';
     setStatus(msg);
     logEvent(msg);
+    els.btnRematch.classList.remove('hidden');
     return true;
   }
 
@@ -278,6 +309,7 @@
     const msg = `🏳️ You resigned. ${variant.name} accepts smugly.`;
     setStatus(msg);
     logEvent(msg);
+    els.btnRematch.classList.remove('hidden');
   }
 
   function undo() {
@@ -343,10 +375,15 @@
 
   async function boot() {
     buildPicker();
-    els.btnNew.addEventListener('click', backToPicker);
-    els.btnSwitch.addEventListener('click', backToPicker);
+    els.btnNew.addEventListener('click', () => startGame(variant.id, false));
+    els.btnRematch.addEventListener('click', () => startGame(variant.id, false));
+    els.btnSwitch.addEventListener('click', goToPicker);
     els.btnUndo.addEventListener('click', undo);
     els.btnResign.addEventListener('click', resign);
+    window.addEventListener('popstate', applyLocation);
+
+    // Deep link: /#tiltfish opens straight into that game.
+    applyLocation();
 
     engine = new SillyEngine();
     try {
