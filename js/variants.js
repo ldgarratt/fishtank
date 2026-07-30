@@ -35,6 +35,10 @@ function clampUciElo(effectiveElo) {
  *   onEngineMovePlayed(state, move, game)-> after the engine's move; may return event strings
  *   onPlayerMoveAsync(state, ctx)        -> async version of onPlayerMove, with engine access;
  *                                           ctx = { move, game, engine, fenBefore, legalCount }
+ *   pickMove(state, ctx)                 -> choose the engine's move yourself (async);
+ *                                           ctx = { game, engine, fen, legalCount };
+ *                                           return { uci, events } or null to fall through
+ *   eloLabel(state)                      -> replace the Elo readout with custom text
  *   extraRandomChance(state, game)       -> additional probability [0,1] of a random move
  *   checkCustomEnd(state, game)          -> return { winner: 'player'|'engine'|'draw', msg }
  *                                           to end the game with a custom rule
@@ -215,6 +219,34 @@ const VARIANTS = {
           `🕊️ It captured your ${pieceName(move.captured)}: −300 Elo → ${state.elo}`,
         ];
       }
+    },
+  },
+
+  drawfish: {
+    id: 'drawfish',
+    name: 'DrawFish',
+    emoji: '🤝',
+    tagline: 'Always plays the move that keeps the evaluation closest to 0.00.',
+    description:
+      'Searches every legal move at full strength and plays whichever one ' +
+      'leaves the position nearest to dead equal. It is not trying to beat ' +
+      'you — it is trying to draw. To win, you have to make equality impossible.',
+    baseElo: ELO_MAX,
+    eloLabel: () => '0.00',
+    demo: [['♗d3', '+0.04', ''], ['♔e2', '−0.02', ''], ['♕g4', '0.00', '']],
+    art: { acc: [['🤝', 29, 8, 1.7, 0], ['⚖️', 6, 30, 1.2, 0]] },
+    async pickMove(state, ctx) {
+      const ranked = await ctx.engine.rankMoves(ctx.fen, ctx.legalCount, 10);
+      if (!ranked || !ranked.length) return null;
+      let choice = ranked[0];
+      for (const r of ranked) {
+        if (Math.abs(r.score) < Math.abs(choice.score)) choice = r;
+      }
+      const evalText = (choice.score / 100).toFixed(2);
+      return {
+        uci: choice.move,
+        events: [`🤝 Nearest to equality: eval ${choice.score > 0 ? '+' : ''}${evalText}`],
+      };
     },
   },
 

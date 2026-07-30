@@ -186,8 +186,8 @@ console.log('Random-move probability model');
   assert(clampUciElo(-5) === ELO_MIN, 'clamp lower');
 }
 
-console.log('PityFish');
-{
+async function testPityFish() {
+  console.log('PityFish');
   const v = VARIANTS.pityfish;
   const s = { elo: v.baseElo, moveCount: 0 };
   const fakeEngine = (worst) => ({ rankWorstMove: async () => ({ worst, ranked: 20 }) });
@@ -197,8 +197,7 @@ console.log('PityFish');
     fenBefore: 'startpos',
     legalCount: 20,
   });
-
-  (async () => {
+  {
     assert(v.baseElo === 3190, 'starts at full strength');
 
     let evs = await v.onPlayerMoveAsync(s, ctx('e2', 'e4'));
@@ -231,13 +230,57 @@ console.log('PityFish');
       legalCount: 1,
     });
     assert(s3.elo === 3190, 'a forced (only legal) move is not punished');
+  }
+}
 
-    if (failures) {
-      console.error(failures + ' test(s) FAILED');
-      process.exit(1);
-    }
-    console.log('All tests passed ✔');
-  })();
+async function testDrawFish() {
+  console.log('DrawFish');
+  const v = VARIANTS.drawfish;
+  const s = { elo: v.baseElo, moveCount: 0 };
+  const engineWith = (ranked) => ({ rankMoves: async () => ranked });
+  {
+    assert(v.eloLabel() === '0.00', 'shows 0.00 instead of an Elo number');
+
+    // Winning moves available, but it wants the level one.
+    let res = await v.pickMove(s, {
+      engine: engineWith([
+        { move: 'd1h5', score: 620 },
+        { move: 'g1f3', score: 240 },
+        { move: 'b1c3', score: 12 },
+        { move: 'f1a6', score: -180 },
+      ]),
+      fen: 'x',
+      legalCount: 4,
+    });
+    assert(res.uci === 'b1c3', 'picks the move closest to 0.00 (+0.12), not the best (+6.20)');
+    assert(res.events[0].includes('+0.12'), 'reports the evaluation it chose');
+
+    // Negative side of zero counts equally.
+    res = await v.pickMove(s, {
+      engine: engineWith([
+        { move: 'a2a3', score: 300 },
+        { move: 'b2b3', score: -5 },
+        { move: 'c2c3', score: 40 },
+      ]),
+      fen: 'x',
+      legalCount: 3,
+    });
+    assert(res.uci === 'b2b3', 'a small negative eval beats a larger positive one');
+
+    // Losing position: least-bad option.
+    res = await v.pickMove(s, {
+      engine: engineWith([
+        { move: 'h1g1', score: -400 },
+        { move: 'h1h2', score: -900 },
+      ]),
+      fen: 'x',
+      legalCount: 2,
+    });
+    assert(res.uci === 'h1g1', 'when all moves lose, it plays the least-bad');
+
+    res = await v.pickMove(s, { engine: engineWith(null), fen: 'x', legalCount: 5 });
+    assert(res === null, 'falls through gracefully when ranking is unavailable');
+  }
 }
 
 console.log('Analysis scoring');
@@ -267,5 +310,14 @@ console.log('Analysis scoring');
   );
 }
 
-// Final pass/fail is reported by the async PityFish block above, which
-// resolves after these synchronous checks have run.
+// Async suites run last, then the overall result is reported.
+(async () => {
+  await testDrawFish();
+  await testPityFish();
+  console.log('');
+  if (failures) {
+    console.error(failures + ' test(s) FAILED');
+    process.exit(1);
+  }
+  console.log('All tests passed \u2714');
+})();

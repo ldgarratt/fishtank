@@ -207,14 +207,15 @@ class SillyEngine {
   }
 
   /**
-   * Rank every legal move with a MultiPV search and return the worst one.
-   * Used by PityFish. Runs at full strength (the limiter randomizes move
-   * choice, which would distort the ranking) and restores the caller's
-   * settings afterwards.
-   * Resolves { worst, uci } or null when the ranking is unavailable.
+   * Rank every legal move with a MultiPV search, best first.
+   * Used by PityFish (worst move) and DrawFish (most equal move). Runs at
+   * full strength — the limiter randomizes move choice, which would distort
+   * the ranking — and restores single-PV settings afterwards.
+   * Resolves an array of { move, score } sorted descending by score (from
+   * the side-to-move's perspective), or null if unavailable.
    */
-  async rankWorstMove(fen, legalCount, depth) {
-    if (!legalCount || legalCount < 2) return null;
+  async rankMoves(fen, legalCount, depth) {
+    if (!legalCount) return null;
     const multipv = Math.min(250, legalCount);
     this.send('setoption name UCI_LimitStrength value false');
     this.send('setoption name Skill Level value 20');
@@ -253,8 +254,16 @@ class SillyEngine {
     this.lastElo = null;
 
     if (!lines.size) return null;
-    const ranked = [...lines.values()].sort((a, b) => a.score - b.score);
-    return { worst: ranked[0].move, best: result, ranked: ranked.length };
+    void result;
+    return [...lines.values()].sort((a, b) => b.score - a.score);
+  }
+
+  /** Convenience wrapper: the lowest-ranked legal move. */
+  async rankWorstMove(fen, legalCount, depth) {
+    if (!legalCount || legalCount < 2) return null;
+    const ranked = await this.rankMoves(fen, legalCount, depth);
+    if (!ranked || !ranked.length) return null;
+    return { worst: ranked[ranked.length - 1].move, ranked: ranked.length };
   }
 
   /** Ask for the best move from a FEN. Resolves with a UCI move string like "e2e4" or "e7e8q". */

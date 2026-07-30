@@ -118,6 +118,7 @@
     // Fairy variants (DragonFish) use their own rules engine and game loop.
     if (variant.fairy) {
       DragonMode.stop();
+      vstate = { elo: variant.baseElo, moveCount: 0 };
       playerColor = els.sideSelect.value === 'b' ? 'b' : 'w';
       game = null;
       gameOver = false;
@@ -475,7 +476,42 @@
 
     let engineCaptured = false;
     let engMove = null;
-    if (Math.random() < pRandom) {
+
+    // Variants that choose their own move (DrawFish aiming for 0.00).
+    let picked = null;
+    if (variant.pickMove && engineReady) {
+      try {
+        picked = await variant.pickMove(vstate, {
+          game,
+          engine,
+          fen: game.fen(),
+          legalCount: game.moves().length,
+        });
+      } catch (err) {
+        console.warn('pickMove failed, falling back to normal search:', err);
+      }
+    }
+
+    if (picked && picked.uci) {
+      const played = game.move({
+        from: picked.uci.slice(0, 2),
+        to: picked.uci.slice(2, 4),
+        promotion: picked.uci.length > 4 ? picked.uci[4] : undefined,
+      });
+      if (played) {
+        san = played.san;
+        engMove = played;
+        engineCaptured = !!played.captured;
+        logMove(variant.name, san);
+        for (const ev of picked.events || []) logEvent(ev);
+      } else {
+        picked = null; // illegal suggestion — fall through to the normal path
+      }
+    }
+
+    if (picked && picked.uci && san) {
+      // move already played above
+    } else if (Math.random() < pRandom) {
       const moves = game.moves({ verbose: true });
       const m = moves[Math.floor(Math.random() * moves.length)];
       await sleep(350 + Math.random() * 500);
@@ -720,9 +756,10 @@
   /* ---------- UI helpers ---------- */
 
   function updateEloUI() {
+    const label = variant.eloLabel ? variant.eloLabel(vstate) : Math.round(vstate.elo);
     els.oppName.innerHTML =
       `${variant.emoji} ${variant.name} ` +
-      `<span class="opp-elo-inline">(${Math.round(vstate.elo)})</span>`;
+      `<span class="opp-elo-inline">(${label})</span>`;
     const span = ELO_MAX - 800; // display floor at 800 so the bar can visibly empty
     const pct = Math.max(0, Math.min(1, (vstate.elo - 800) / span));
     els.eloBar.style.width = (pct * 100).toFixed(1) + '%';
