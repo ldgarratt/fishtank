@@ -33,6 +33,8 @@ function clampUciElo(effectiveElo) {
  *   onPlayerMove(state, move, game)      -> after the human moves; may return event strings
  *   onEngineTurnStart(state, game)       -> before the engine thinks; may return event strings
  *   onEngineMovePlayed(state, move, game)-> after the engine's move; may return event strings
+ *   onPlayerMoveAsync(state, ctx)        -> async version of onPlayerMove, with engine access;
+ *                                           ctx = { move, game, engine, fenBefore, legalCount }
  *   extraRandomChance(state, game)       -> additional probability [0,1] of a random move
  *   checkCustomEnd(state, game)          -> return { winner: 'player'|'engine'|'draw', msg }
  *                                           to end the game with a custom rule
@@ -212,6 +214,34 @@ const VARIANTS = {
         return [
           `🕊️ It captured your ${pieceName(move.captured)}: −300 Elo → ${state.elo}`,
         ];
+      }
+    },
+  },
+
+  pityfish: {
+    id: 'pityfish',
+    name: 'PityFish',
+    emoji: '😢',
+    tagline: 'Loses 500 Elo every time you play the worst move on the board.',
+    description:
+      'Starts at 3190 Elo. Every time your move is the single worst legal ' +
+      'move in the position, it feels so sorry for you that it loses 500 Elo. ' +
+      'Blunder deliberately at your own risk.',
+    baseElo: ELO_MAX,
+    demo: [['♖a8??', '2690', '−500'], ['♕xh7??', '2190', '−500'], ['♘g1??', '1690', '−500']],
+    art: { acc: [['😢', 30, 7, 1.6, 0], ['💧', 8, 30, 1.2, 0]] },
+    /** Needs the engine to rank every legal move, so this hook is async. */
+    async onPlayerMoveAsync(state, ctx) {
+      const { move, engine, fenBefore, legalCount } = ctx;
+      if (!engine || legalCount < 2) return;
+      const ranking = await engine.rankWorstMove(fenBefore, legalCount, 8);
+      if (!ranking || !ranking.worst) return;
+      const played = move.from + move.to + (move.promotion || '');
+      const worst = ranking.worst;
+      // Compare ignoring promotion suffix mismatches (e.g. "e7e8q" vs "e7e8").
+      if (played === worst || played.slice(0, 4) === worst.slice(0, 4)) {
+        state.elo -= 500;
+        return [`😢 ${move.san} was the worst move available: −500 Elo → ${state.elo}`];
       }
     },
   },

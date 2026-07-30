@@ -294,9 +294,11 @@
           showPromo(selectedSquare, sq);
           return;
         }
+        const fenBefore = game.fen();
+        const legalCount = game.moves().length;
         const move = game.move({ from: selectedSquare, to: sq });
         selectedSquare = null;
-        afterPlayerMove(move);
+        afterPlayerMove(move, fenBefore, legalCount);
         return;
       }
     }
@@ -386,8 +388,10 @@
         pendingPromo = null;
         promo.classList.add('hidden');
         selectedSquare = null;
+        const fenBefore = game.fen();
+        const legalCount = game.moves().length;
         const move = game.move({ from: pm.from, to: pm.to, promotion: b.dataset.p });
-        if (move) afterPlayerMove(move);
+        if (move) afterPlayerMove(move, fenBefore, legalCount);
         else renderBoard();
       };
     });
@@ -412,13 +416,15 @@
       return;
     }
     // Premoved promotions auto-queen, like chess.com's default.
+    const fenBefore = game.fen();
+    const legalCount = game.moves().length;
     const move = game.move({ from: pm.from, to: pm.to, promotion: 'q' });
-    if (move) afterPlayerMove(move);
+    if (move) afterPlayerMove(move, fenBefore, legalCount);
   }
 
   /* ---------- game loop ---------- */
 
-  function afterPlayerMove(move) {
+  async function afterPlayerMove(move, fenBefore, legalCount) {
     renderBoard();
     sound.play(move.captured ? 'capture' : 'move');
     if (game.in_check()) sound.play('check');
@@ -426,6 +432,28 @@
     const events = (variant.onPlayerMove && variant.onPlayerMove(vstate, move, game)) || [];
     for (const ev of events) logEvent(ev);
     updateEloUI();
+
+    // Hooks that need the engine (e.g. PityFish ranking every legal move).
+    if (variant.onPlayerMoveAsync && engineReady) {
+      thinking = true;
+      setStatus(`${variant.name} is judging your move…`);
+      try {
+        const evs =
+          (await variant.onPlayerMoveAsync(vstate, {
+            move,
+            game,
+            engine,
+            fenBefore,
+            legalCount,
+          })) || [];
+        for (const ev of evs) logEvent(ev);
+      } catch (err) {
+        console.warn('async variant hook failed:', err);
+      }
+      thinking = false;
+      updateEloUI();
+    }
+
     if (checkGameEnd()) return;
     engineMove();
   }

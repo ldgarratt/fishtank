@@ -20,6 +20,7 @@ installs. The app just adjusts the engine's strength settings between moves.
 | **SharkFish** | 🦈 | Starts at 1600. **Gains 150 Elo every time it checks YOUR king.** Keep your king safe. |
 | **PacifistFish** | 🕊️ | **Loses 300 Elo every time IT captures one of your pieces.** Bait it into trades. |
 | **CowardFish** | 🙈 | **Loses 100 Elo for each of your pieces on its half of the board.** March forward. |
+| **PityFish** | 😢 | Starts at 3190. **Loses 500 Elo whenever your move is the single worst legal move** in the position. |
 | **ThreeCheckFish** | ✅ | Fixed 2200 Elo, but **three-check rules: first side to give three checks wins.** It doesn't know the rule. |
 | **DragonFish** | 🐉 | **Amazon chess** (beta): each queen is a dragon that also moves like a knight. Rules by Fairy-Stockfish. |
 
@@ -131,7 +132,10 @@ Hooks you can use: `onPlayerMove(state, move, game)` (after the human moves),
 `onEngineTurnStart(state, game)` (before the engine thinks),
 `onEngineMovePlayed(state, move, game)` (after the engine's move),
 `extraRandomChance(state, game)` (probability of a totally random move), and
-`checkCustomEnd(state, game)` (custom win conditions, e.g. three-check).
+`checkCustomEnd(state, game)` (custom win conditions, e.g. three-check), and
+`onPlayerMoveAsync(state, ctx)` for hooks that need the engine — `ctx` gives
+you `{ move, game, engine, fenBefore, legalCount }`, so a variant can rank
+every legal move (this is how PityFish spots your worst one).
 `state.playerColor` tells you which side the human plays.
 `state.elo` is the effective Elo; below 1320 the app automatically converts
 the deficit into random-move probability.

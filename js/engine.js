@@ -206,6 +206,57 @@ class SillyEngine {
     });
   }
 
+  /**
+   * Rank every legal move with a MultiPV search and return the worst one.
+   * Used by PityFish. Runs at full strength (the limiter randomizes move
+   * choice, which would distort the ranking) and restores the caller's
+   * settings afterwards.
+   * Resolves { worst, uci } or null when the ranking is unavailable.
+   */
+  async rankWorstMove(fen, legalCount, depth) {
+    if (!legalCount || legalCount < 2) return null;
+    const multipv = Math.min(250, legalCount);
+    this.send('setoption name UCI_LimitStrength value false');
+    this.send('setoption name Skill Level value 20');
+    this.send('setoption name MultiPV value ' + multipv);
+
+    const lines = new Map(); // multipv index -> { move, score, depth }
+    const result = await new Promise((resolve) => {
+      const re = /\bdepth (\d+)\b.*?\bmultipv (\d+)\b.*?\bscore (cp|mate) (-?\d+).*?\bpv (\S+)/;
+      const handler = (line) => {
+        if (line.startsWith('info')) {
+          const m = line.match(re);
+          if (m) {
+            const d = parseInt(m[1], 10);
+            const idx = parseInt(m[2], 10);
+            const score =
+              m[3] === 'cp'
+                ? parseInt(m[4], 10)
+                : parseInt(m[4], 10) > 0
+                  ? 100000 - parseInt(m[4], 10)
+                  : -100000 - parseInt(m[4], 10);
+            const prev = lines.get(idx);
+            if (!prev || d >= prev.depth) lines.set(idx, { move: m[5], score, depth: d });
+          }
+        } else if (line.startsWith('bestmove')) {
+          this.listeners = this.listeners.filter((f) => f !== handler);
+          resolve(line.split(/\s+/)[1]);
+        }
+      };
+      this.onLine(handler);
+      this.send('position fen ' + fen);
+      this.send('go depth ' + depth);
+    });
+
+    // Restore: single PV, and force strength reconfiguration for the next move.
+    this.send('setoption name MultiPV value 1');
+    this.lastElo = null;
+
+    if (!lines.size) return null;
+    const ranked = [...lines.values()].sort((a, b) => a.score - b.score);
+    return { worst: ranked[0].move, best: result, ranked: ranked.length };
+  }
+
   /** Ask for the best move from a FEN. Resolves with a UCI move string like "e2e4" or "e7e8q". */
   bestMove(fen, movetimeMs) {
     return new Promise((resolve) => {

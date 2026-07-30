@@ -186,6 +186,60 @@ console.log('Random-move probability model');
   assert(clampUciElo(-5) === ELO_MIN, 'clamp lower');
 }
 
+console.log('PityFish');
+{
+  const v = VARIANTS.pityfish;
+  const s = { elo: v.baseElo, moveCount: 0 };
+  const fakeEngine = (worst) => ({ rankWorstMove: async () => ({ worst, ranked: 20 }) });
+  const ctx = (from, to, promotion) => ({
+    move: { from, to, promotion, san: from + to },
+    engine: fakeEngine('a1a2'),
+    fenBefore: 'startpos',
+    legalCount: 20,
+  });
+
+  (async () => {
+    assert(v.baseElo === 3190, 'starts at full strength');
+
+    let evs = await v.onPlayerMoveAsync(s, ctx('e2', 'e4'));
+    assert(s.elo === 3190 && !evs, 'a normal move costs nothing');
+
+    evs = await v.onPlayerMoveAsync(s, ctx('a1', 'a2'));
+    assert(s.elo === 2690, 'playing the worst move costs 500');
+    assert(evs && evs.length === 1, 'announces the pity');
+
+    await v.onPlayerMoveAsync(s, ctx('a1', 'a2'));
+    assert(s.elo === 2190, 'repeat offences keep costing 500');
+
+    // Promotion suffix should not defeat the comparison.
+    const s2 = { elo: v.baseElo, moveCount: 0 };
+    const promoCtx = {
+      move: { from: 'a7', to: 'a8', promotion: 'n', san: 'a8=N' },
+      engine: fakeEngine('a7a8'),
+      fenBefore: 'x',
+      legalCount: 12,
+    };
+    await v.onPlayerMoveAsync(s2, promoCtx);
+    assert(s2.elo === 2690, 'promotion suffix mismatch still matches the worst move');
+
+    // Forced moves are never punished.
+    const s3 = { elo: v.baseElo, moveCount: 0 };
+    await v.onPlayerMoveAsync(s3, {
+      move: { from: 'a1', to: 'a2', san: 'Ka2' },
+      engine: fakeEngine('a1a2'),
+      fenBefore: 'x',
+      legalCount: 1,
+    });
+    assert(s3.elo === 3190, 'a forced (only legal) move is not punished');
+
+    if (failures) {
+      console.error(failures + ' test(s) FAILED');
+      process.exit(1);
+    }
+    console.log('All tests passed ✔');
+  })();
+}
+
 console.log('Analysis scoring');
 {
   const { Analysis } = require(path.join(__dirname, '..', 'js', 'analysis.js'));
@@ -213,9 +267,5 @@ console.log('Analysis scoring');
   );
 }
 
-console.log('');
-if (failures) {
-  console.error(failures + ' test(s) FAILED');
-  process.exit(1);
-}
-console.log('All tests passed ✔');
+// Final pass/fail is reported by the async PityFish block above, which
+// resolves after these synchronous checks have run.
