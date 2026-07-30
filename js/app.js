@@ -44,6 +44,8 @@
   let selectedSquare = null;
   let thinking = false;
   let gameOver = false;
+  let premove = null; // { from, to } queued while the engine thinks
+  let pendingPromo = null; // { from, to } awaiting promotion piece choice
 
   /* ---------- variant picker ---------- */
 
@@ -68,13 +70,26 @@
     for (const v of Object.values(VARIANTS)) {
       const card = document.createElement('button');
       card.className = 'card';
+      const art = v.art || {};
+      const fishStyle =
+        `transform:${art.transform || 'rotate(-12deg)'};` +
+        `filter:${art.filter || 'none'}`;
+      const accessories = (art.acc || [])
+        .map(
+          ([em, right, top, size, rot]) =>
+            `<span class="acc" style="right:${right}%;top:${top}%;` +
+            `font-size:${size}rem;transform:rotate(${rot}deg)">${em}</span>`
+        )
+        .join('');
       card.innerHTML =
         `<div class="thumb">` +
         `<div class="thumb-evals">${demoRows(v)}</div>` +
-        `<img class="thumb-fish" src="img/stockfish.png" alt="" onerror="this.remove()">` +
-        `<span class="thumb-emoji">${v.emoji}</span>` +
+        `<div class="fish-wrap ${art.anim || ''}">` +
+        `<img class="thumb-fish" style="${fishStyle}" src="img/stockfish.png" alt="" onerror="this.remove()">` +
         `</div>` +
-        `<div class="card-name">${v.name}</div>` +
+        accessories +
+        `</div>` +
+        `<div class="card-name">${v.emoji} ${v.name}</div>` +
         `<div class="card-tag">${v.tagline}</div>`;
       card.addEventListener('click', () => startGame(v.id, true));
       els.cards.appendChild(card);
@@ -98,6 +113,9 @@
     selectedSquare = null;
     thinking = false;
     gameOver = false;
+    premove = null;
+    pendingPromo = null;
+    document.getElementById('promo').classList.add('hidden');
 
     els.picker.classList.add('hidden');
     els.game.classList.remove('hidden');
@@ -173,6 +191,7 @@
           cell.appendChild(img);
         }
         if (selectedSquare === sq) cell.classList.add('selected');
+        if (premove && (premove.from === sq || premove.to === sq)) cell.classList.add('premove');
         if (legalTargets.has(sq)) cell.classList.add(piece ? 'capture-target' : 'move-target');
         if (lastMove && (lastMove.from === sq || lastMove.to === sq)) cell.classList.add('last-move');
         if (piece && piece.type === 'k' && game.in_check() && piece.color === game.turn()) {
@@ -187,18 +206,45 @@
   /* ---------- interaction ---------- */
 
   function onSquareClick(sq) {
-    if (thinking || gameOver || !game) return;
-    if (game.turn() !== playerColor) return;
-
+    if (gameOver || !game || pendingPromo) return;
     const piece = game.get(sq);
+
+    // Premove mode: queue a move while the engine is thinking (chess.com style).
+    if (thinking || game.turn() !== playerColor) {
+      if (!thinking) return;
+      if (selectedSquare) {
+        if (sq === selectedSquare) {
+          selectedSquare = null;
+          premove = null;
+        } else {
+          premove = { from: selectedSquare, to: sq };
+          selectedSquare = null;
+        }
+      } else if (piece && piece.color === playerColor) {
+        selectedSquare = sq;
+        premove = null;
+      } else {
+        premove = null;
+      }
+      renderBoard();
+      return;
+    }
+
     if (selectedSquare) {
       if (sq === selectedSquare) {
         selectedSquare = null;
         renderBoard();
         return;
       }
-      const move = game.move({ from: selectedSquare, to: sq, promotion: 'q' });
-      if (move) {
+      const candidates = game
+        .moves({ square: selectedSquare, verbose: true })
+        .filter((m) => m.to === sq);
+      if (candidates.length) {
+        if (candidates[0].flags.indexOf('p') !== -1) {
+          showPromo(selectedSquare, sq);
+          return;
+        }
+        const move = game.move({ from: selectedSquare, to: sq });
         selectedSquare = null;
         afterPlayerMove(move);
         return;
@@ -210,6 +256,58 @@
       selectedSquare = null;
     }
     renderBoard();
+  }
+
+  /* ---------- promotion picker ---------- */
+
+  function showPromo(from, to) {
+    pendingPromo = { from, to };
+    const promo = document.getElementById('promo');
+    promo.innerHTML =
+      `<div class="promo-inner">` +
+      ['q', 'r', 'n', 'b']
+        .map(
+          (t) =>
+            `<button data-p="${t}"><img src="${PIECE_BASE + playerColor + t.toUpperCase()}.svg" alt="${t}"></button>`
+        )
+        .join('') +
+      `</div>`;
+    promo.classList.remove('hidden');
+    promo.querySelectorAll('button').forEach((b) => {
+      b.onclick = (e) => {
+        e.stopPropagation();
+        const pm = pendingPromo;
+        pendingPromo = null;
+        promo.classList.add('hidden');
+        selectedSquare = null;
+        const move = game.move({ from: pm.from, to: pm.to, promotion: b.dataset.p });
+        if (move) afterPlayerMove(move);
+        else renderBoard();
+      };
+    });
+    promo.onclick = () => {
+      // Click outside the buttons cancels.
+      pendingPromo = null;
+      promo.classList.add('hidden');
+      selectedSquare = null;
+      renderBoard();
+    };
+  }
+
+  /* ---------- premove execution ---------- */
+
+  function tryPremove() {
+    if (!premove || gameOver) return;
+    const pm = premove;
+    premove = null;
+    const candidates = game.moves({ square: pm.from, verbose: true }).filter((m) => m.to === pm.to);
+    if (!candidates.length) {
+      renderBoard();
+      return;
+    }
+    // Premoved promotions auto-queen, like chess.com's default.
+    const move = game.move({ from: pm.from, to: pm.to, promotion: 'q' });
+    if (move) afterPlayerMove(move);
   }
 
   /* ---------- game loop ---------- */
@@ -292,6 +390,7 @@
     updateEloUI();
     if (checkGameEnd()) return;
     setStatus('Your move.');
+    tryPremove();
   }
 
   function moveTimeFor(uciElo) {
@@ -325,7 +424,8 @@
   function resign() {
     if (thinking || gameOver || !game) return;
     gameOver = true;
-    const msg = `🏳️ You resigned. ${variant.name} accepts smugly.`;
+    premove = null;
+    const msg = `🏳️ You resigned. ${variant.name} wins.`;
     sound.play('defeat');
     setStatus(msg);
     logEvent(msg);
@@ -340,7 +440,8 @@
     if (game.turn() !== playerColor && game.history().length > 0) game.undo();
     gameOver = false;
     selectedSquare = null;
-    logEvent('↩️ Move taken back (Elo effects are NOT refunded — actions have consequences).');
+    premove = null;
+    logEvent('↩️ Move taken back (Elo effects are not refunded).');
     renderBoard();
     setStatus('Your move.');
   }

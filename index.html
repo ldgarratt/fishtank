@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>FishTank — emotionally unstable Stockfish variants</title>
-  <link rel="stylesheet" href="css/style.css?v=7" />
+  <link rel="stylesheet" href="css/style.css?v=8" />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80'>🐟</text></svg>" />
 </head>
 <body>
@@ -36,7 +36,10 @@
   <main id="game" class="hidden">
     <div class="game-layout">
       <div class="board-col">
-        <div id="board" class="board"></div>
+        <div class="board-wrap">
+          <div id="board" class="board"></div>
+          <div id="promo" class="promo hidden"></div>
+        </div>
         <div id="status" class="status"></div>
         <div class="controls">
           <button id="btn-rematch" class="primary hidden">⚔️ Rematch</button>
@@ -99,10 +102,10 @@
         ['vendor/chess.js',
          'https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js',
          'https://cdn.jsdelivr.net/npm/chess.js@0.10.3/chess.js'],
-        ['js/variants.js?v=7'],
-        ['js/engine.js?v=7'],
-        ['js/sound.js?v=7'],
-        ['js/app.js?v=7'],
+        ['js/variants.js?v=8'],
+        ['js/engine.js?v=8'],
+        ['js/sound.js?v=8'],
+        ['js/app.js?v=8'],
       ]);
     })();
   </script>
