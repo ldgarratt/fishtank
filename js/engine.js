@@ -109,7 +109,7 @@ class SillyEngine {
     for (const src of ENGINE_SOURCES) {
       try {
         if (onStatus) onStatus('Loading ' + src.name + '…');
-        this.worker = await this._tryInit(src, src.kind === 'local' ? 6000 : 25000);
+        this.worker = await this._tryInit(src, src.kind === 'local' ? 15000 : 25000);
         this.sourceName = src.name;
         this.worker.onerror = null;
         this.worker.onmessage = (e) => {

@@ -65,6 +65,35 @@ missing (e.g. running from a plain checkout), the app automatically falls back
 to loading the engine from jsDelivr, and Stockfish 10 (asm.js) as a last
 resort.
 
+## Add your own fish
+
+Every bot is one entry in `js/variants.js` — no other file changes needed.
+The card, Elo meter, and event feed pick it up automatically. Example, a fish
+that gets stronger every time it gives *you* check:
+
+```js
+bloodfish: {
+  id: 'bloodfish',
+  name: 'BloodFish',
+  emoji: '🩸',
+  tagline: 'Gains 150 Elo every time it checks YOUR king.',
+  description: 'It can smell weakness. Keep your king safe.',
+  baseElo: 1600,
+  onEngineTurnStart(state, game) {
+    if (game.in_check()) {
+      state.elo = Math.min(ELO_MAX, state.elo + 150);
+      return [`🩸 BloodFish tastes blood — +150 Elo → ${state.elo}`];
+    }
+  },
+},
+```
+
+Hooks you can use: `onPlayerMove(state, move, game)` (after the human moves),
+`onEngineTurnStart(state, game)` (before the engine thinks), and
+`extraRandomChance(state, game)` (probability of a totally random move).
+`state.elo` is the effective Elo; below 1320 the app automatically converts
+the deficit into random-move probability.
+
 ## Tech
 
 - [Stockfish](https://stockfishchess.org/) 16.1 "lite" single-threaded WASM
