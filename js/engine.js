@@ -18,10 +18,18 @@ const ENGINE_SOURCES = [
     script: 'engine/stockfish-16.1-lite-single.js',
   },
   {
-    name: 'Stockfish 16.1 lite (CDN)',
+    name: 'Stockfish 16.1 lite (jsDelivr)',
     kind: 'cdn-wasm',
-    base: 'https://cdn.jsdelivr.net/npm/stockfish@16.1.0/src/',
+    base: 'https://cdn.jsdelivr.net/gh/nmrugg/stockfish.js@v16.1.0/src/',
     script: 'stockfish-16.1-lite-single.js',
+    wasm: 'stockfish-16.1-lite-single.wasm',
+  },
+  {
+    name: 'Stockfish 16.1 lite (GitHub raw)',
+    kind: 'cdn-wasm',
+    base: 'https://raw.githubusercontent.com/nmrugg/stockfish.js/v16.1.0/src/',
+    script: 'stockfish-16.1-lite-single.js',
+    wasm: 'stockfish-16.1-lite-single.wasm',
   },
   {
     name: 'Stockfish 10 (CDN, asm.js)',
@@ -43,16 +51,19 @@ class SillyEngine {
   }
 
   _spawnCdn(src) {
-    let shim;
+    // Cross-origin Worker construction is blocked, but importScripts() inside a
+    // same-origin blob worker is not. Stockfish.js finds its .wasm via the
+    // worker URL's #hash (first comma-separated field), so we pass the CDN
+    // wasm URL there.
+    let shim, hash = '';
     if (src.kind === 'cdn-wasm') {
-      shim =
-        `self.Module = { locateFile: function (p) { return ${JSON.stringify(src.base)} + p; } };\n` +
-        `importScripts(${JSON.stringify(src.base + src.script)});`;
+      shim = `importScripts(${JSON.stringify(src.base + src.script)});`;
+      hash = '#' + encodeURIComponent(src.base + src.wasm);
     } else {
       shim = `importScripts(${JSON.stringify(src.url)});`;
     }
     const blob = new Blob([shim], { type: 'application/javascript' });
-    return new Worker(URL.createObjectURL(blob));
+    return new Worker(URL.createObjectURL(blob) + hash);
   }
 
   _tryInit(src, timeoutMs) {

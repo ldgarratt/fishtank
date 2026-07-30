@@ -26,11 +26,7 @@ jobs:
       # Vendor Stockfish + chess.js into the deployed site so it is fully
       # self-contained (no CDN needed at runtime).
       - name: Download engine and libraries
-        run: |
-          bash engine/get-engine.sh
-          mkdir -p vendor
-          curl -fsSL -o vendor/chess.js \
-            https://cdn.jsdelivr.net/npm/chess.js@0.13.4/chess.js
+        run: bash engine/get-engine.sh
 
       - uses: actions/configure-pages@v5
         with:

@@ -80,7 +80,9 @@
         load(groups[0], function () { chain(groups.slice(1)); });
       }
       chain([
-        ['vendor/chess.js', 'https://cdn.jsdelivr.net/npm/chess.js@0.13.4/chess.js'],
+        ['vendor/chess.js',
+         'https://cdn.jsdelivr.net/npm/chess.js@0.13.4/chess.js',
+         'https://raw.githubusercontent.com/jhlywa/chess.js/v0.13.4/chess.js'],
         ['js/variants.js'],
         ['js/engine.js'],
         ['js/app.js'],
