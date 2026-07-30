@@ -186,6 +186,33 @@ console.log('Random-move probability model');
   assert(clampUciElo(-5) === ELO_MIN, 'clamp lower');
 }
 
+console.log('Analysis scoring');
+{
+  const { Analysis } = require(path.join(__dirname, '..', 'js', 'analysis.js'));
+  assert(Math.abs(Analysis.winPercent(0) - 50) < 1e-6, 'even position = 50% win chance');
+  assert(Analysis.winPercent(300) > 70, '+3 pawns is a large advantage (' +
+    Analysis.winPercent(300).toFixed(1) + '%)');
+  assert(Analysis.winPercent(-300) < 30, '-3 pawns is losing');
+  assert(
+    Math.abs(Analysis.winPercent(200) + Analysis.winPercent(-200) - 100) < 1e-6,
+    'win chances are symmetric'
+  );
+
+  assert(Analysis.classify(0).key === 'best', '0 cp lost = best');
+  assert(Analysis.classify(45).key === 'good', '45 cp lost = good');
+  assert(Analysis.classify(80).key === 'inaccuracy', '80 cp lost = inaccuracy');
+  assert(Analysis.classify(150).key === 'mistake', '150 cp lost = mistake');
+  assert(Analysis.classify(600).key === 'blunder', '600 cp lost = blunder');
+
+  assert(Math.abs(Analysis.moveAccuracy(50, 50) - 100) < 0.1, 'no loss = ~100% accuracy');
+  const hangQueen = Analysis.moveAccuracy(Analysis.winPercent(0), Analysis.winPercent(-900));
+  assert(hangQueen < 25, 'hanging a queen tanks accuracy (' + hangQueen.toFixed(1) + '%)');
+  assert(
+    Analysis.moveAccuracy(50, 45) > Analysis.moveAccuracy(50, 30),
+    'smaller drops score higher'
+  );
+}
+
 console.log('');
 if (failures) {
   console.error(failures + ' test(s) FAILED');

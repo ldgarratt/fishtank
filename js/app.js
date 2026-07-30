@@ -1,5 +1,5 @@
 /* FishTank — main app: board UI, game loop, variant wiring. */
-/* global Chess, VARIANTS, randomMoveProbability, clampUciElo, ELO_MIN, ELO_MAX, SillyEngine, SoundBox, DragonMode */
+/* global Chess, VARIANTS, randomMoveProbability, clampUciElo, ELO_MIN, ELO_MAX, SillyEngine, SoundBox, DragonMode, Analysis */
 
 (() => {
   // cburnett SVG pieces (CC BY-SA 3.0) — same look locally and deployed:
@@ -31,6 +31,9 @@
     btnResign: document.getElementById('btn-resign'),
     btnRematch: document.getElementById('btn-rematch'),
     btnSound: document.getElementById('btn-sound'),
+    btnPgn: document.getElementById('btn-pgn'),
+    btnAnalyse: document.getElementById('btn-analyse'),
+    analysis: document.getElementById('analysis'),
     sideSelect: document.getElementById('side-select'),
   };
 
@@ -106,6 +109,11 @@
       history.pushState(null, '', '#' + variantId);
     }
     els.btnRematch.classList.add('hidden');
+    els.btnAnalyse.classList.add('hidden');
+    els.analysis.classList.add('hidden');
+    els.analysis.innerHTML = '';
+    // PGN and analysis need chess.js history, which fairy mode doesn't have.
+    els.btnPgn.classList.toggle('hidden', !!variant.fairy);
 
     // Fairy variants (DragonFish) use their own rules engine and game loop.
     if (variant.fairy) {
@@ -528,7 +536,129 @@
     setStatus(msg);
     logEvent(msg);
     els.btnRematch.classList.remove('hidden');
+    offerAnalysis();
     return true;
+  }
+
+  /* ---------- PGN + analysis ---------- */
+
+  function buildPgn() {
+    if (!game) return '';
+    const white = playerColor === 'w' ? 'You' : variant.name;
+    const black = playerColor === 'w' ? variant.name : 'You';
+    let result = '*';
+    if (game.in_checkmate()) result = game.turn() === 'w' ? '0-1' : '1-0';
+    else if (game.game_over()) result = '1/2-1/2';
+    game.header(
+      'Event', 'FishTank',
+      'Site', location.origin + location.pathname,
+      'Date', new Date().toISOString().slice(0, 10).replace(/-/g, '.'),
+      'White', white,
+      'Black', black,
+      'Result', result,
+      'Variant', variant.name
+    );
+    return game.pgn({ max_width: 80, newline_char: '\n' });
+  }
+
+  async function copyPgn() {
+    const pgn = buildPgn();
+    if (!pgn) return;
+    try {
+      await navigator.clipboard.writeText(pgn);
+      flashButton(els.btnPgn, '✅ Copied!', '📋 Copy PGN');
+    } catch (e) {
+      // Clipboard blocked (http, permissions) — fall back to a prompt.
+      window.prompt('Copy the PGN:', pgn);
+    }
+  }
+
+  function flashButton(btn, temp, restore) {
+    btn.textContent = temp;
+    setTimeout(() => (btn.textContent = restore), 1600);
+  }
+
+  function offerAnalysis() {
+    if (variant.fairy || !game || game.history().length < 2 || !engineReady) return;
+    els.btnAnalyse.classList.remove('hidden');
+  }
+
+  async function analyseGame() {
+    if (!game || !engineReady) return;
+    const history = game.history({ verbose: true });
+    if (!history.length) return;
+    els.btnAnalyse.disabled = true;
+    els.analysis.classList.remove('hidden');
+    els.analysis.innerHTML =
+      '<h2>Analysis</h2><div class="an-progress"><div class="an-bar" style="width:0%"></div></div>' +
+      '<div class="an-note">Analysing at depth ' + Analysis.DEPTH + '…</div>';
+    const bar = els.analysis.querySelector('.an-bar');
+
+    try {
+      const report = await Analysis.run(engine, history, (done, total) => {
+        bar.style.width = Math.round((done / total) * 100) + '%';
+      });
+      renderAnalysis(report);
+    } catch (err) {
+      els.analysis.innerHTML = '<h2>Analysis</h2><div class="an-note">Analysis failed: ' + err + '</div>';
+    } finally {
+      els.btnAnalyse.disabled = false;
+      engine.lastElo = null; // force strength reconfiguration for the next game
+    }
+  }
+
+  function evalGraph(graph) {
+    if (!graph.length) return '';
+    const W = 300, H = 70, CLAMP = 800;
+    const pts = graph.map((cp, i) => {
+      const x = (i / Math.max(1, graph.length - 1)) * W;
+      const v = Math.max(-CLAMP, Math.min(CLAMP, cp));
+      const y = H / 2 - (v / CLAMP) * (H / 2);
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    });
+    return (
+      `<svg class="an-graph" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">` +
+      `<rect x="0" y="0" width="${W}" height="${H / 2}" fill="rgba(255,255,255,0.06)"/>` +
+      `<polyline points="${pts.join(' ')}" fill="none" stroke="var(--accent)" stroke-width="2"/>` +
+      `<line x1="0" y1="${H / 2}" x2="${W}" y2="${H / 2}" stroke="rgba(255,255,255,0.35)" stroke-width="1"/>` +
+      `</svg>`
+    );
+  }
+
+  function renderAnalysis(report) {
+    const mySide = playerColor;
+    const theirSide = playerColor === 'w' ? 'b' : 'w';
+    const me = report.summary[mySide];
+    const them = report.summary[theirSide];
+    const row = (label, s) =>
+      `<div class="an-side"><div class="an-side-name">${label}</div>` +
+      `<div class="an-acc">${s.accuracy.toFixed(1)}%</div>` +
+      `<div class="an-counts">` +
+      `<span class="an-c blunder">${s.counts.blunder} ??</span>` +
+      `<span class="an-c mistake">${s.counts.mistake} ?</span>` +
+      `<span class="an-c inaccuracy">${s.counts.inaccuracy} ?!</span>` +
+      `<span class="an-c acpl">${s.acpl} acpl</span></div></div>`;
+
+    const notable = report.moves
+      .filter((m) => m.cls.key === 'blunder' || m.cls.key === 'mistake' || m.cls.key === 'inaccuracy')
+      .map(
+        (m) =>
+          `<div class="an-move ${m.cls.key}">` +
+          `<span class="an-badge">${m.cls.icon}</span>` +
+          `<span class="an-san">${m.n}${m.color === 'w' ? '.' : '...'} ${m.san}</span>` +
+          `<span class="an-loss">−${(m.loss / 100).toFixed(1)}</span>` +
+          (m.best ? `<span class="an-best">best: ${m.best}</span>` : '') +
+          `</div>`
+      )
+      .join('');
+
+    els.analysis.innerHTML =
+      '<h2>Analysis</h2>' +
+      `<div class="an-summary">${row('You', me)}${row(variant.name, them)}</div>` +
+      evalGraph(report.graph) +
+      (notable
+        ? `<div class="an-moves">${notable}</div>`
+        : '<div class="an-note">No mistakes worth mentioning. Clean game.</div>');
   }
 
   /* ---------- undo ---------- */
@@ -542,6 +672,7 @@
     setStatus(msg);
     logEvent(msg);
     els.btnRematch.classList.remove('hidden');
+    offerAnalysis();
   }
 
   function undo() {
@@ -621,6 +752,8 @@
       e.preventDefault();
       goToPicker();
     });
+    els.btnPgn.addEventListener('click', copyPgn);
+    els.btnAnalyse.addEventListener('click', analyseGame);
     window.addEventListener('popstate', applyLocation);
 
     const soundLabel = () => (sound.enabled ? '🔊 Sound' : '🔇 Muted');

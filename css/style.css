@@ -299,6 +299,47 @@ main { flex: 1; width: 100%; max-width: 1280px; margin: 0 auto; padding: 12px 24
   padding: 6px 10px; margin: 6px 0; border-radius: 0 8px 8px 0;
 }
 
+/* ---------- post-game analysis ---------- */
+.analysis {
+  background: var(--panel); border-radius: 12px; padding: 14px; margin-bottom: 16px;
+}
+.analysis h2 {
+  margin: 0 0 10px; font-size: 0.85rem; color: var(--muted);
+  text-transform: uppercase; letter-spacing: 0.1em;
+}
+.an-progress { height: 8px; background: rgba(0,0,0,0.35); border-radius: 4px; overflow: hidden; }
+.an-bar { height: 100%; width: 0; background: var(--accent); transition: width 0.2s linear; }
+.an-note { color: var(--muted); font-size: 0.85rem; margin-top: 8px; }
+
+.an-summary { display: flex; gap: 10px; }
+.an-side { flex: 1; background: rgba(0,0,0,0.28); border-radius: 10px; padding: 10px; min-width: 0; }
+.an-side-name {
+  font-size: 0.78rem; color: var(--muted); text-transform: uppercase;
+  letter-spacing: 0.05em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.an-acc { font-size: 1.6rem; font-weight: 800; line-height: 1.15; font-variant-numeric: tabular-nums; }
+.an-counts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; font-size: 0.72rem; }
+.an-c { color: var(--muted); }
+.an-c.blunder { color: #ff7b72; }
+.an-c.mistake { color: #ffb74d; }
+.an-c.inaccuracy { color: #fff176; }
+
+.an-graph { width: 100%; height: 70px; margin: 12px 0 4px; display: block; }
+
+.an-moves { max-height: 220px; overflow-y: auto; margin-top: 8px; }
+.an-move {
+  display: flex; align-items: baseline; gap: 8px;
+  padding: 5px 8px; border-radius: 8px; font-size: 0.85rem;
+  border-left: 3px solid transparent;
+}
+.an-move.blunder { border-left-color: #ff7b72; background: rgba(255, 123, 114, 0.09); }
+.an-move.mistake { border-left-color: #ffb74d; background: rgba(255, 183, 77, 0.08); }
+.an-move.inaccuracy { border-left-color: #fff176; background: rgba(255, 241, 118, 0.06); }
+.an-badge { font-weight: 800; min-width: 20px; }
+.an-san { font-weight: 700; }
+.an-loss { color: var(--muted); font-variant-numeric: tabular-nums; }
+.an-best { color: var(--muted); margin-left: auto; font-size: 0.78rem; }
+
 footer { text-align: center; color: var(--muted); font-size: 0.78rem; padding: 16px; }
 footer a { color: var(--accent); }
 

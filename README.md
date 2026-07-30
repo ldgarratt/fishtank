@@ -43,6 +43,16 @@ doesn't stream from a CDN:
 bash engine/get-engine.sh
 ```
 
+## After the game
+
+- **Copy PGN** — puts the full game on your clipboard with headers, ready to
+  paste into lichess, chess.com, or a database.
+- **Analyse game** — replays the game through Stockfish at full strength
+  (depth 12) and reports accuracy percentages, average centipawn loss, and
+  every inaccuracy, mistake, and blunder with the move that was better,
+  plus an evaluation graph. Same method lichess and chess.com use: each move
+  is scored by how much winning chance it gave away.
+
 ## How the strength adjustment works
 
 Each bot tracks an *effective Elo* that its rules update during the game, and

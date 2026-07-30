@@ -166,6 +166,46 @@ class SillyEngine {
     }
   }
 
+  /** Full strength, no limiter — used for post-game analysis. */
+  setFullStrength() {
+    this.lastElo = null; // force reconfiguration for the next game
+    this.weakDepth = null;
+    this.send('setoption name UCI_LimitStrength value false');
+    this.send('setoption name Skill Level value 20');
+  }
+
+  /**
+   * Evaluate a position at fixed depth.
+   * Resolves { cp, mate, best } where cp/mate are from the side-to-move's
+   * perspective and best is the engine's preferred move in UCI notation.
+   */
+  evaluate(fen, depth) {
+    return new Promise((resolve) => {
+      let cp = 0;
+      let mate = null;
+      const handler = (line) => {
+        if (line.startsWith('info') && line.includes(' score ')) {
+          const m = line.match(/ score (cp|mate) (-?\d+)/);
+          if (m) {
+            if (m[1] === 'cp') {
+              cp = parseInt(m[2], 10);
+              mate = null;
+            } else {
+              mate = parseInt(m[2], 10);
+              cp = mate > 0 ? 10000 : -10000;
+            }
+          }
+        } else if (line.startsWith('bestmove')) {
+          this.listeners = this.listeners.filter((f) => f !== handler);
+          resolve({ cp, mate, best: line.split(/\s+/)[1] });
+        }
+      };
+      this.onLine(handler);
+      this.send('position fen ' + fen);
+      this.send('go depth ' + depth);
+    });
+  }
+
   /** Ask for the best move from a FEN. Resolves with a UCI move string like "e2e4" or "e7e8q". */
   bestMove(fen, movetimeMs) {
     return new Promise((resolve) => {
