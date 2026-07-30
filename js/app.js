@@ -44,7 +44,9 @@
       const card = document.createElement('button');
       card.className = 'card';
       card.innerHTML =
-        `<div class="card-emoji">${v.emoji}</div>` +
+        `<div class="card-icon"><img src="img/stockfish.png" alt="" ` +
+        `onerror="this.parentElement.classList.add('no-logo');this.remove()">` +
+        `<span class="card-emoji">${v.emoji}</span></div>` +
         `<div class="card-name">${v.name}</div>` +
         `<div class="card-tag">${v.tagline}</div>`;
       card.addEventListener('click', () => startGame(v.id));

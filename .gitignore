@@ -2,5 +2,6 @@
 engine/stockfish-16.1-lite-single.js
 engine/stockfish-16.1-lite-single.wasm
 vendor/chess.js
+img/stockfish.png
 node_modules/
 .DS_Store

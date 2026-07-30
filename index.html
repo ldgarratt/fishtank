@@ -9,7 +9,7 @@
 </head>
 <body>
   <header>
-    <h1>🐟 FishTank</h1>
+    <h1><img class="header-logo" src="img/stockfish.png" alt="" onerror="this.remove()" /> FishTank</h1>
     <p class="subtitle">Real Stockfish, but emotionally unstable. Pick your opponent.</p>
     <div id="engine-status" class="engine-status">Loading engine…</div>
   </header>
@@ -31,15 +31,21 @@
     <div class="game-layout">
       <div class="board-col">
         <div class="opponent-bar">
-          <span id="mood" class="mood">🤖</span>
+          <div class="opp-icon">
+            <img src="img/stockfish.png" alt="Stockfish" onerror="this.remove()" />
+            <span id="mood" class="mood">🤖</span>
+          </div>
           <div class="opp-text">
             <div id="opp-name" class="opp-name"></div>
             <div id="opp-tagline" class="opp-tagline"></div>
           </div>
+          <div class="opp-elo-box">
+            <div id="elo-value" class="opp-elo">?</div>
+            <div class="opp-elo-label">current elo</div>
+          </div>
         </div>
         <div class="elo-wrap">
           <div class="elo-track"><div id="elo-bar" class="elo-bar"></div></div>
-          <div class="elo-label">Current Elo: <span id="elo-value">?</span></div>
         </div>
         <div id="board" class="board"></div>
         <div id="status" class="status"></div>
@@ -61,6 +67,7 @@
       Powered by real <a href="https://stockfishchess.org/" target="_blank" rel="noopener">Stockfish</a>
       (GPLv3) with its strength limiter abused for comedy.
       Chess rules by <a href="https://github.com/jhlywa/chess.js" target="_blank" rel="noopener">chess.js</a>.
+      Stockfish icon by Klein Maetschke.
     </p>
   </footer>
 

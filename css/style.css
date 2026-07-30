@@ -50,7 +50,7 @@ main { flex: 1; width: 100%; max-width: 1100px; margin: 0 auto; padding: 16px; }
   font: inherit;
 }
 .card:hover { transform: translateY(-3px); border-color: var(--accent); }
-.card-emoji { font-size: 2.4rem; }
+.card-emoji { font-size: 2.4rem; line-height: 1; }
 .card-name { font-size: 1.25rem; font-weight: 700; margin-top: 6px; }
 .card-tag { color: var(--muted); margin-top: 4px; font-size: 0.95rem; }
 
@@ -70,9 +70,25 @@ main { flex: 1; width: 100%; max-width: 1100px; margin: 0 auto; padding: 16px; }
   display: flex; align-items: center; gap: 12px;
   background: var(--panel); border-radius: 12px; padding: 10px 14px;
 }
-.mood { font-size: 2rem; }
+.opp-icon { position: relative; width: 48px; height: 48px; flex: 0 0 48px; }
+.opp-icon img { width: 100%; height: 100%; object-fit: contain; }
+.mood { position: absolute; right: -8px; bottom: -6px; font-size: 1.3rem; }
+.opp-text { flex: 1; min-width: 0; }
 .opp-name { font-weight: 700; font-size: 1.1rem; }
 .opp-tagline { color: var(--muted); font-size: 0.85rem; }
+.opp-elo-box { text-align: right; }
+.opp-elo {
+  font-size: 1.8rem; font-weight: 800; line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.opp-elo-label { color: var(--muted); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; }
+
+.header-logo { height: 1.15em; vertical-align: -0.18em; }
+
+.card-icon { position: relative; width: 56px; height: 56px; }
+.card-icon img { width: 100%; height: 100%; object-fit: contain; }
+.card-icon .card-emoji { position: absolute; right: -14px; bottom: -8px; font-size: 1.7rem; }
+.card-icon.no-logo .card-emoji { position: static; font-size: 2.4rem; }
 
 .elo-wrap { margin: 10px 0; }
 .elo-track {
@@ -89,6 +105,7 @@ main { flex: 1; width: 100%; max-width: 1100px; margin: 0 auto; padding: 16px; }
 .board {
   display: grid;
   grid-template-columns: repeat(8, 1fr);
+  grid-template-rows: repeat(8, 1fr); /* equal ranks — empty rows must not collapse */
   aspect-ratio: 1 / 1;
   width: 100%;
   max-width: 560px;

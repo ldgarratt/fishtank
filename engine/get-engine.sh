@@ -29,5 +29,11 @@ if grep -qE '^\s*export ' ../vendor/chess.js; then
   exit 1
 fi
 
+# Official Stockfish logo (icon by Klein Maetschke) for the UI.
+mkdir -p ../img
+curl -fsSL -o ../img/stockfish.png \
+  "https://stockfishchess.org/images/logo/icon_128x128@2x.png"
+[ "$(wc -c < ../img/stockfish.png)" -gt 1000 ]
+
 echo "Done. Files downloaded:"
 ls -lh stockfish-16.1-lite-single.* ../vendor/chess.js
