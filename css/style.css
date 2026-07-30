@@ -137,12 +137,23 @@ main { flex: 1; width: 100%; max-width: 1280px; margin: 0 auto; padding: 12px 24
   font: inherit;
 }
 
-/* ---------- game layout ---------- */
+/* ---------- game layout ----------
+   Desktop: board left, bot card + feed right.
+   Mobile: bot card ABOVE the board (so you always see who you're playing
+   and their live Elo), then board, then feed. */
 .game-layout {
-  display: flex; gap: 28px; align-items: flex-start; flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: minmax(300px, 640px) minmax(270px, 420px);
+  grid-template-areas:
+    'board bot'
+    'board log';
+  gap: 18px 28px;
+  align-items: start;
+  justify-content: center;
 }
-.board-col { flex: 0 1 640px; min-width: 300px; }
-.side-col { flex: 1 1 300px; min-width: 270px; max-width: 430px; }
+.board-col { grid-area: board; min-width: 0; }
+.bot-panel { grid-area: bot; min-width: 0; }
+.log-col { grid-area: log; min-width: 0; align-self: stretch; }
 
 /* ---------- board ---------- */
 .board-wrap { position: relative; }
@@ -266,7 +277,7 @@ main { flex: 1; width: 100%; max-width: 1280px; margin: 0 auto; padding: 12px 24
 .opp-name .opp-elo-inline { font-weight: 700; color: var(--accent); }
 .opp-desc { color: var(--muted); font-size: 0.9rem; margin-top: 5px; line-height: 1.4; }
 
-.elo-wrap { margin: 12px 0 16px; }
+.elo-wrap { margin: 12px 0 0; }
 .elo-track { height: 10px; background: rgba(0,0,0,0.35); border-radius: 5px; overflow: hidden; }
 .elo-bar { height: 100%; width: 100%; border-radius: 5px; transition: width 0.5s ease, background 0.5s ease; }
 .elo-high { background: linear-gradient(90deg, #ef5350, #ff8a65); }
@@ -292,6 +303,14 @@ footer { text-align: center; color: var(--muted); font-size: 0.78rem; padding: 1
 footer a { color: var(--accent); }
 
 @media (max-width: 760px) {
-  .game-layout { flex-direction: column; }
-  .side-col { max-width: none; }
+  .game-layout {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      'bot'
+      'board'
+      'log';
+  }
+  header { padding: 14px 16px 4px; }
+  main { padding: 10px 12px 20px; }
+  .log { max-height: 260px; }
 }

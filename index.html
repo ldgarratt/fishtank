@@ -7,7 +7,7 @@
        engine). Harmless 404 when the file isn't vendored. -->
   <script src="coi-serviceworker.js"></script>
   <title>FishTank — Stockfish variants with mood swings</title>
-  <link rel="stylesheet" href="css/style.css?v=12" />
+  <link rel="stylesheet" href="css/style.css?v=13" />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80'>🐟</text></svg>" />
 </head>
 <body>
@@ -38,6 +38,21 @@
   <!-- Game view -->
   <main id="game" class="hidden">
     <div class="game-layout">
+      <div class="bot-panel">
+        <div class="bot-card">
+          <div class="bot-avatar">
+            <img src="img/stockfish.png" alt="" onerror="this.remove()" />
+            <span id="mood" class="mood">🤖</span>
+          </div>
+          <div class="bot-info">
+            <div id="opp-name" class="opp-name"></div>
+            <div id="opp-desc" class="opp-desc"></div>
+          </div>
+        </div>
+        <div class="elo-wrap">
+          <div class="elo-track"><div id="elo-bar" class="elo-bar"></div></div>
+        </div>
+      </div>
       <div class="board-col">
         <div class="board-wrap">
           <div id="board" class="board"></div>
@@ -53,24 +68,9 @@
           <button id="btn-sound">🔊 Sound</button>
         </div>
       </div>
-      <div class="side-col">
-        <div class="bot-card">
-          <div class="bot-avatar">
-            <img src="img/stockfish.png" alt="" onerror="this.remove()" />
-            <span id="mood" class="mood">🤖</span>
-          </div>
-          <div class="bot-info">
-            <div id="opp-name" class="opp-name"></div>
-            <div id="opp-desc" class="opp-desc"></div>
-          </div>
-        </div>
-        <div class="elo-wrap">
-          <div class="elo-track"><div id="elo-bar" class="elo-bar"></div></div>
-        </div>
-        <div class="log-col">
-          <h2>Feed</h2>
-          <div id="log" class="log"></div>
-        </div>
+      <div class="log-col">
+        <h2>Feed</h2>
+        <div id="log" class="log"></div>
       </div>
     </div>
   </main>
