@@ -1,5 +1,5 @@
 /* FishTank — main app: board UI, game loop, variant wiring. */
-/* global Chess, VARIANTS, randomMoveProbability, clampUciElo, ELO_MIN, ELO_MAX, SillyEngine */
+/* global Chess, VARIANTS, randomMoveProbability, clampUciElo, ELO_MIN, ELO_MAX, SillyEngine, SoundBox */
 
 (() => {
   // cburnett SVG pieces (CC BY-SA 3.0) — same look locally and deployed:
@@ -30,11 +30,13 @@
     btnUndo: document.getElementById('btn-undo'),
     btnResign: document.getElementById('btn-resign'),
     btnRematch: document.getElementById('btn-rematch'),
+    btnSound: document.getElementById('btn-sound'),
     sideSelect: document.getElementById('side-select'),
   };
 
   let engine = null;
   let engineReady = false;
+  const sound = new SoundBox();
   let game = null; // chess.js instance
   let variant = null;
   let vstate = null; // { elo, moveCount, ... }
@@ -104,6 +106,7 @@
     logEvent(`New game vs ${variant.name}. Starting Elo: ${vstate.elo}`);
     updateEloUI();
     renderBoard();
+    sound.play('start');
 
     if (engine && engineReady) engine.newGame();
 
@@ -213,6 +216,7 @@
 
   function afterPlayerMove(move) {
     renderBoard();
+    sound.play(game.in_check() ? 'check' : move.captured ? 'capture' : 'move');
     logMove('You', move.san);
     const events = (variant.onPlayerMove && variant.onPlayerMove(vstate, move, game)) || [];
     for (const ev of events) logEvent(ev);
@@ -236,12 +240,14 @@
     const pRandom = Math.min(0.95, pBelowFloor + pExtra);
     let san = null;
 
+    let engineCaptured = false;
     if (Math.random() < pRandom) {
       const moves = game.moves({ verbose: true });
       const m = moves[Math.floor(Math.random() * moves.length)];
       await sleep(350 + Math.random() * 500);
       const played = game.move(m.san);
       san = played.san;
+      engineCaptured = !!played.captured;
       logMove(variant.name, san + '  🎲');
     } else {
       const uciElo = clampUciElo(vstate.elo);
@@ -261,13 +267,16 @@
         // Extremely defensive: engine gave an illegal move (shouldn't happen).
         const moves = game.moves({ verbose: true });
         const m = moves[Math.floor(Math.random() * moves.length)];
-        game.move(m.san);
+        const p2 = game.move(m.san);
         san = m.san;
+        engineCaptured = !!(p2 && p2.captured);
       } else {
         san = played.san;
+        engineCaptured = !!played.captured;
       }
       logMove(variant.name, san);
     }
+    sound.play(game.in_check() ? 'check' : engineCaptured ? 'capture' : 'move');
 
     vstate.moveCount += 1;
     thinking = false;
@@ -291,10 +300,12 @@
       msg = winnerIsPlayer
         ? `🏆 Checkmate — you beat ${variant.name}!`
         : `💀 Checkmate — ${variant.name} wins.`;
+      sound.play(winnerIsPlayer ? 'victory' : 'defeat');
     } else if (game.in_stalemate()) msg = '🤝 Stalemate.';
     else if (game.in_threefold_repetition()) msg = '🤝 Draw by repetition.';
     else if (game.insufficient_material()) msg = '🤝 Draw — insufficient material.';
     else msg = '🤝 Draw (50-move rule).';
+    if (!game.in_checkmate()) sound.play('draw');
     setStatus(msg);
     logEvent(msg);
     els.btnRematch.classList.remove('hidden');
@@ -307,6 +318,7 @@
     if (thinking || gameOver || !game) return;
     gameOver = true;
     const msg = `🏳️ You resigned. ${variant.name} accepts smugly.`;
+    sound.play('defeat');
     setStatus(msg);
     logEvent(msg);
     els.btnRematch.classList.remove('hidden');
@@ -381,6 +393,14 @@
     els.btnUndo.addEventListener('click', undo);
     els.btnResign.addEventListener('click', resign);
     window.addEventListener('popstate', applyLocation);
+
+    const soundLabel = () => (sound.enabled ? '🔊 Sound' : '🔇 Muted');
+    els.btnSound.textContent = soundLabel();
+    els.btnSound.addEventListener('click', () => {
+      sound.toggle();
+      els.btnSound.textContent = soundLabel();
+    });
+    sound.preload();
 
     // Deep link: /#tiltfish opens straight into that game.
     applyLocation();
