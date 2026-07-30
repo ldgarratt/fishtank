@@ -275,6 +275,67 @@ console.log('Weak-play model (lichess-style skill noise)');
   assert(pickWithSkillNoise([], -5) === null, 'empty candidate list is handled');
 }
 
+async function testWorstFish() {
+  console.log('WorstFish');
+  const v = VARIANTS.worstfish;
+  const s = { elo: v.baseElo, moveCount: 0 };
+  const engineWith = (ranked) => ({ rankMoves: async () => ranked });
+  {
+    assert(v.eloLabel() === 'worst', 'shows "worst" instead of an Elo number');
+
+    // rankMoves returns best-first, so the worst move is last.
+    let res = await v.pickMove(s, {
+      engine: engineWith([
+        { move: 'd1h5', score: 620 },
+        { move: 'g1f3', score: 240 },
+        { move: 'b1c3', score: 12 },
+        { move: 'f1a6', score: -940 },
+      ]),
+      fen: 'x',
+      legalCount: 4,
+    });
+    assert(res.uci === 'f1a6', 'picks the lowest-scoring move, ignoring the best');
+    assert(res.events[0].includes('-9.40'), 'reports the evaluation it threw away');
+
+    // Even when every move is winning, it picks the least winning one.
+    res = await v.pickMove(s, {
+      engine: engineWith([
+        { move: 'a1a8', score: 900 },
+        { move: 'b2b4', score: 400 },
+        { move: 'c1c2', score: 150 },
+      ]),
+      fen: 'x',
+      legalCount: 3,
+    });
+    assert(res.uci === 'c1c2', 'in a winning position it plays the least winning move');
+
+    // Single legal move: it has no choice.
+    res = await v.pickMove(s, {
+      engine: engineWith([{ move: 'h1g1', score: -50 }]),
+      fen: 'x',
+      legalCount: 1,
+    });
+    assert(res.uci === 'h1g1', 'a forced move is played normally');
+
+    res = await v.pickMove(s, { engine: engineWith(null), fen: 'x', legalCount: 5 });
+    assert(res === null, 'falls through gracefully when ranking is unavailable');
+
+    // WorstFish and DrawFish must not agree except by coincidence.
+    const ranked = [
+      { move: 'a', score: 500 },
+      { move: 'b', score: 5 },
+      { move: 'c', score: -700 },
+    ];
+    const worst = await v.pickMove(s, { engine: engineWith(ranked), fen: 'x', legalCount: 3 });
+    const draw = await VARIANTS.drawfish.pickMove(s, {
+      engine: engineWith(ranked),
+      fen: 'x',
+      legalCount: 3,
+    });
+    assert(worst.uci === 'c' && draw.uci === 'b', 'WorstFish and DrawFish choose differently');
+  }
+}
+
 async function testPityFish() {
   console.log('PityFish');
   const v = VARIANTS.pityfish;
@@ -402,6 +463,7 @@ console.log('Analysis scoring');
 // Async suites run last, then the overall result is reported.
 (async () => {
   await testDrawFish();
+  await testWorstFish();
   await testPityFish();
   console.log('');
   if (failures) {

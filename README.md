@@ -21,6 +21,7 @@ installs. The app just adjusts the engine's strength settings between moves.
 | **PacifistFish** | 🕊️ | **Loses 300 Elo every time IT captures one of your pieces.** Bait it into trades. |
 | **CowardFish** | 🙈 | **Loses 100 Elo for each of your pieces on its half of the board.** March forward. |
 | **DrawFish** | 🤝 | Plays the move that keeps the evaluation **closest to 0.00**. It isn't trying to win — it's trying to draw. |
+| **WorstFish** | 💀 | Plays the **worst legal move** in every position. Hangs everything, walks into mate. |
 | **PityFish** | 😢 | Starts at 3190. **Loses 500 Elo whenever your move is the single worst legal move** in the position. |
 | **ThreeCheckFish** | ✅ | Fixed 2200 Elo, but **three-check rules: first side to give three checks wins.** It doesn't know the rule. |
 | **DragonFish** | 🐉 | **Amazon chess** (beta): each queen is a dragon that also moves like a knight. Rules by Fairy-Stockfish. |

@@ -259,6 +259,31 @@ const VARIANTS = {
     },
   },
 
+  worstfish: {
+    id: 'worstfish',
+    name: 'WorstFish',
+    emoji: '💀',
+    tagline: 'Always plays the worst legal move in the position.',
+    description:
+      'Searches every legal move at full strength and plays the one with the ' +
+      'lowest evaluation. It hangs everything, walks into mate, and refuses ' +
+      'any good move. Losing to it is an achievement.',
+    baseElo: ELO_MAX,
+    eloLabel: () => 'worst',
+    demo: [['♖a8??', '−9.4', '↓'], ['♕xh7??', '−12.1', '↓'], ['♔e2??', '#−3', '↓']],
+    art: { filter: 'grayscale(0.85)', anim: 'wobble', acc: [['💀', 30, 7, 1.7, 0], ['📉', 6, 30, 1.2, 0]] },
+    async pickMove(state, ctx) {
+      const ranked = await ctx.engine.rankMoves(ctx.fen, ctx.legalCount, 8);
+      if (!ranked || !ranked.length) return null;
+      const choice = ranked[ranked.length - 1]; // rankMoves is best-first
+      const evalText = (choice.score / 100).toFixed(2);
+      return {
+        uci: choice.move,
+        events: [`💀 Worst move available: eval ${choice.score > 0 ? '+' : ''}${evalText}`],
+      };
+    },
+  },
+
   pityfish: {
     id: 'pityfish',
     name: 'PityFish',
