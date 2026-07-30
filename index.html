@@ -4,18 +4,24 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>FishTank — emotionally unstable Stockfish variants</title>
-  <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="css/style.css?v=3" />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80'>🐟</text></svg>" />
 </head>
 <body>
   <header>
-    <h1><img class="header-logo" src="img/stockfish.png" alt="" onerror="this.remove()" /> FishTank</h1>
-    <p class="subtitle">Real Stockfish, but emotionally unstable. Pick your opponent.</p>
+    <div class="header-row">
+      <img class="header-logo" src="img/stockfish.png" alt="" onerror="this.remove()" />
+      <div>
+        <h1>FishTank</h1>
+        <p class="subtitle">Real Stockfish, but emotionally unstable.</p>
+      </div>
+    </div>
     <div id="engine-status" class="engine-status">Loading engine…</div>
   </header>
 
   <!-- Variant picker -->
   <main id="picker">
+    <h2>Variant Bots</h2>
     <div id="variant-cards" class="cards"></div>
     <div class="side-row">
       <label for="side-select">Play as:</label>
@@ -30,34 +36,33 @@
   <main id="game" class="hidden">
     <div class="game-layout">
       <div class="board-col">
-        <div class="opponent-bar">
-          <div class="opp-icon">
-            <img src="img/stockfish.png" alt="Stockfish" onerror="this.remove()" />
+        <div id="board" class="board"></div>
+        <div id="status" class="status"></div>
+        <div class="controls">
+          <button id="btn-undo">↩️ Undo</button>
+          <button id="btn-resign">🏳️ Resign</button>
+          <button id="btn-new">🔄 New game</button>
+          <button id="btn-switch">🐟 Switch fish</button>
+        </div>
+      </div>
+      <div class="side-col">
+        <div class="bot-card">
+          <div class="bot-avatar">
+            <img src="img/stockfish.png" alt="" onerror="this.remove()" />
             <span id="mood" class="mood">🤖</span>
           </div>
-          <div class="opp-text">
+          <div class="bot-info">
             <div id="opp-name" class="opp-name"></div>
-            <div id="opp-tagline" class="opp-tagline"></div>
-          </div>
-          <div class="opp-elo-box">
-            <div id="elo-value" class="opp-elo">?</div>
-            <div class="opp-elo-label">current elo</div>
+            <div id="opp-desc" class="opp-desc"></div>
           </div>
         </div>
         <div class="elo-wrap">
           <div class="elo-track"><div id="elo-bar" class="elo-bar"></div></div>
         </div>
-        <div id="board" class="board"></div>
-        <div id="status" class="status"></div>
-        <div class="controls">
-          <button id="btn-undo">↩️ Undo</button>
-          <button id="btn-new">🔄 New game</button>
-          <button id="btn-switch">🐟 Switch fish</button>
+        <div class="log-col">
+          <h2>Feed</h2>
+          <div id="log" class="log"></div>
         </div>
-      </div>
-      <div class="log-col">
-        <h2>Feed</h2>
-        <div id="log" class="log"></div>
       </div>
     </div>
   </main>
@@ -68,6 +73,7 @@
       (GPLv3) with its strength limiter abused for comedy.
       Chess rules by <a href="https://github.com/jhlywa/chess.js" target="_blank" rel="noopener">chess.js</a>.
       Stockfish icon by Klein Maetschke.
+      Chess pieces by Colin M.L. Burnett (CC BY-SA 3.0).
     </p>
   </footer>
 
@@ -90,9 +96,9 @@
         ['vendor/chess.js',
          'https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js',
          'https://cdn.jsdelivr.net/npm/chess.js@0.10.3/chess.js'],
-        ['js/variants.js'],
-        ['js/engine.js'],
-        ['js/app.js'],
+        ['js/variants.js?v=3'],
+        ['js/engine.js?v=3'],
+        ['js/app.js?v=3'],
       ]);
     })();
   </script>

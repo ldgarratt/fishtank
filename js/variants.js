@@ -42,6 +42,7 @@ const VARIANTS = {
       'Starts at full strength. Every check you deliver sends it into a spiral. ' +
       'Sacrifice everything. Hunt the king.',
     baseElo: ELO_MAX,
+    demo: [['♗b5+', '2990', '−200'], ['♕h5+', '2790', '−200'], ['♖e8+', '2590', '−200']],
     onPlayerMove(state, move, game) {
       if (game.in_check()) {
         state.elo -= 200;
@@ -59,6 +60,7 @@ const VARIANTS = {
       'Starts at full strength, but every piece you take sends it deeper on tilt. ' +
       'Trade everything. Watch it crumble.',
     baseElo: ELO_MAX,
+    demo: [['♞xd4', '2990', '−200'], ['♝xf3', '2790', '−200'], ['♜xa2', '2590', '−200']],
     onPlayerMove(state, move) {
       if (move.captured) {
         state.elo -= 200;
@@ -78,6 +80,7 @@ const VARIANTS = {
       'Starts at full strength but gets sleepier every move. Survive the opening ' +
       'and grind it into a blunder-filled endgame.',
     baseElo: ELO_MAX,
+    demo: [['♗d3', '3140', '−50'], ['♔e2', '3090', '−50'], ['♕g4', '3040', '−50']],
     onEngineTurnStart(state) {
       if (state.moveCount > 0) {
         state.elo -= 50;
@@ -95,6 +98,7 @@ const VARIANTS = {
       'Thinks at full strength, but each move has a growing chance of being ' +
       'completely random. It keeps drinking as the game goes on.',
     baseElo: ELO_MAX,
+    demo: [['♗d3', 'best', ''], ['♔e2', 'best', ''], ['♞a3', '??', '🎲']],
     extraRandomChance(state) {
       // +2% per engine move played, capped at 80%.
       return Math.min(0.8, state.moveCount * 0.02);
@@ -116,6 +120,7 @@ const VARIANTS = {
       'Starts barely awake. Every piece you take makes it angrier — and much ' +
       'stronger. How long can you resist taking the bait?',
     baseElo: ELO_MIN,
+    demo: [['♟xe5', '1520', '+200'], ['♞xc3', '1720', '+200'], ['♝xb2', '1920', '+200']],
     onPlayerMove(state, move) {
       if (move.captured) {
         state.elo = Math.min(ELO_MAX, state.elo + 200);
@@ -135,6 +140,7 @@ const VARIANTS = {
       'Every move, it rolls the dice: anywhere from beginner to superhuman. ' +
       'You never know who is across the board.',
     baseElo: Math.round((ELO_MIN + ELO_MAX) / 2),
+    demo: [['♗d3', '1447', '🎲'], ['♔e2', '3102', '🎲'], ['♕g4', '1893', '🎲']],
     onEngineTurnStart(state) {
       state.elo = ELO_MIN + Math.floor(Math.random() * (ELO_MAX - ELO_MIN + 1));
       return [`🎰 GamblerFish rolls the dice... it plays this move at ${state.elo} Elo`];

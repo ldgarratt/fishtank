@@ -2,10 +2,16 @@
 /* global Chess, VARIANTS, randomMoveProbability, clampUciElo, ELO_MIN, ELO_MAX, SillyEngine */
 
 (() => {
-  const UNICODE = {
-    wk: '♔', wq: '♕', wr: '♖', wb: '♗', wn: '♘', wp: '♙',
-    bk: '♚', bq: '♛', br: '♜', bb: '♝', bn: '♞', bp: '♟',
-  };
+  // cburnett SVG pieces (CC BY-SA 3.0): vendored locally by the deploy
+  // workflow, with lichess's copy on GitHub as a per-image fallback.
+  const CDN_PIECE_BASE =
+    'https://raw.githubusercontent.com/lichess-org/lila/master/public/piece/cburnett/';
+  let PIECE_BASE = 'img/pieces/';
+  {
+    const probe = new Image();
+    probe.onerror = () => { PIECE_BASE = CDN_PIECE_BASE; };
+    probe.src = 'img/pieces/wK.svg';
+  }
 
   const els = {
     picker: document.getElementById('picker'),
@@ -13,16 +19,16 @@
     game: document.getElementById('game'),
     board: document.getElementById('board'),
     log: document.getElementById('log'),
-    eloValue: document.getElementById('elo-value'),
     eloBar: document.getElementById('elo-bar'),
     mood: document.getElementById('mood'),
     oppName: document.getElementById('opp-name'),
-    oppTagline: document.getElementById('opp-tagline'),
+    oppDesc: document.getElementById('opp-desc'),
     status: document.getElementById('status'),
     engineStatus: document.getElementById('engine-status'),
     btnNew: document.getElementById('btn-new'),
     btnSwitch: document.getElementById('btn-switch'),
     btnUndo: document.getElementById('btn-undo'),
+    btnResign: document.getElementById('btn-resign'),
     sideSelect: document.getElementById('side-select'),
   };
 
@@ -38,15 +44,33 @@
 
   /* ---------- variant picker ---------- */
 
+  function demoRows(v) {
+    return (v.demo || [])
+      .map(([move, elo, delta]) => {
+        let cls = 'ev-delta';
+        if (delta.startsWith('−') || delta.startsWith('-')) cls += ' neg';
+        else if (delta.startsWith('+')) cls += ' pos';
+        else if (delta) cls += ' dice';
+        return (
+          `<div class="ev"><span class="ev-move">${move}</span>` +
+          `<span class="ev-elo">${elo}</span>` +
+          `<span class="${cls}">${delta}</span></div>`
+        );
+      })
+      .join('');
+  }
+
   function buildPicker() {
     els.cards.innerHTML = '';
     for (const v of Object.values(VARIANTS)) {
       const card = document.createElement('button');
       card.className = 'card';
       card.innerHTML =
-        `<div class="card-icon"><img src="img/stockfish.png" alt="" ` +
-        `onerror="this.parentElement.classList.add('no-logo');this.remove()">` +
-        `<span class="card-emoji">${v.emoji}</span></div>` +
+        `<div class="thumb">` +
+        `<div class="thumb-evals">${demoRows(v)}</div>` +
+        `<img class="thumb-fish" src="img/stockfish.png" alt="" onerror="this.remove()">` +
+        `<span class="thumb-emoji">${v.emoji}</span>` +
+        `</div>` +
         `<div class="card-name">${v.name}</div>` +
         `<div class="card-tag">${v.tagline}</div>`;
       card.addEventListener('click', () => startGame(v.id));
@@ -68,11 +92,9 @@
 
     els.picker.classList.add('hidden');
     els.game.classList.remove('hidden');
-    els.oppName.textContent = `${variant.emoji} ${variant.name}`;
-    els.oppTagline.textContent = variant.tagline;
+    els.oppDesc.textContent = variant.description;
     els.log.innerHTML = '';
-    logEvent(`New game vs ${variant.name}. ${variant.description}`);
-    logEvent(`Starting Elo: ${vstate.elo}`);
+    logEvent(`New game vs ${variant.name}. Starting Elo: ${vstate.elo}`);
     updateEloUI();
     renderBoard();
 
@@ -117,10 +139,17 @@
         cell.dataset.sq = sq;
         const piece = game.get(sq);
         if (piece) {
-          const span = document.createElement('span');
-          span.className = 'piece ' + (piece.color === 'w' ? 'white-piece' : 'black-piece');
-          span.textContent = UNICODE[piece.color + piece.type];
-          cell.appendChild(span);
+          const name = piece.color + piece.type.toUpperCase() + '.svg';
+          const img = document.createElement('img');
+          img.className = 'piece-img';
+          img.alt = piece.color + piece.type;
+          img.draggable = false;
+          img.src = PIECE_BASE + name;
+          img.onerror = () => {
+            img.onerror = null;
+            img.src = CDN_PIECE_BASE + name;
+          };
+          cell.appendChild(img);
         }
         if (selectedSquare === sq) cell.classList.add('selected');
         if (legalTargets.has(sq)) cell.classList.add(piece ? 'capture-target' : 'move-target');
@@ -255,6 +284,14 @@
 
   /* ---------- undo ---------- */
 
+  function resign() {
+    if (thinking || gameOver || !game) return;
+    gameOver = true;
+    const msg = `🏳️ You resigned. ${variant.name} accepts smugly.`;
+    setStatus(msg);
+    logEvent(msg);
+  }
+
   function undo() {
     if (thinking || !game) return;
     // Undo engine reply + player move so it's the player's turn again.
@@ -271,7 +308,9 @@
   /* ---------- UI helpers ---------- */
 
   function updateEloUI() {
-    els.eloValue.textContent = Math.round(vstate.elo);
+    els.oppName.innerHTML =
+      `${variant.emoji} ${variant.name} ` +
+      `<span class="opp-elo-inline">(${Math.round(vstate.elo)})</span>`;
     const span = ELO_MAX - 800; // display floor at 800 so the bar can visibly empty
     const pct = Math.max(0, Math.min(1, (vstate.elo - 800) / span));
     els.eloBar.style.width = (pct * 100).toFixed(1) + '%';
@@ -319,6 +358,7 @@
     els.btnNew.addEventListener('click', backToPicker);
     els.btnSwitch.addEventListener('click', backToPicker);
     els.btnUndo.addEventListener('click', undo);
+    els.btnResign.addEventListener('click', resign);
 
     engine = new SillyEngine();
     try {
