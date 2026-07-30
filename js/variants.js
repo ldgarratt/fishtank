@@ -80,7 +80,7 @@ const VARIANTS = {
       'Its strength never changes. Good luck.',
     baseElo: ELO_MAX,
     demo: [['♗d3', '3190', ''], ['♔e2', '3190', ''], ['♕g4', '3190', '']],
-    art: {},
+    art: { props: [] },
   },
 
   panicfish: {
@@ -91,7 +91,7 @@ const VARIANTS = {
     description: 'Starts at 3190 Elo. Loses 200 Elo each time you give check.',
     baseElo: ELO_MAX,
     demo: [['♗b5+', '2990', '−200'], ['♕h5+', '2790', '−200'], ['♖e8+', '2590', '−200']],
-    art: { anim: 'shake', acc: [['💦',27,6,1.4,20],['💦',7,32,1.1,-15],['❗',40,10,1.3,0]] },
+    art: { anim: 'shake', props: [['sweat', 74, 20, 13, 15], ['sweat', 22, 12, 10, -20], ['glasses', 46, 52, 42, -6]] },
     onPlayerMove(state, move, game) {
       if (game.in_check()) {
         state.elo = clampElo(state.elo - 200);
@@ -108,7 +108,7 @@ const VARIANTS = {
     description: 'Starts at 3190 Elo. Loses 200 Elo each time you capture one of its pieces.',
     baseElo: ELO_MAX,
     demo: [['♞xd4', '2990', '−200'], ['♝xf3', '2790', '−200'], ['♜xa2', '2590', '−200']],
-    art: { filter: 'saturate(1.8) hue-rotate(-25deg)', anim: 'shake', acc: [['💢',30,8,1.6,0]] },
+    art: { filter: 'saturate(1.7) hue-rotate(-18deg)', anim: 'shake', props: [['angerVeins', 72, 16, 20, 0], ['angerVeins', 26, 26, 15, 25]] },
     onPlayerMove(state, move) {
       if (move.captured) {
         state.elo = clampElo(state.elo - 200);
@@ -127,7 +127,7 @@ const VARIANTS = {
     description: 'Starts at 3190 Elo. Loses 50 Elo after every move it plays.',
     baseElo: ELO_MAX,
     demo: [['♗d3', '3140', '−50'], ['♔e2', '3090', '−50'], ['♕g4', '3040', '−50']],
-    art: { transform: 'rotate(38deg)', acc: [['💤',28,6,1.5,0],['💤',14,20,1.1,0]] },
+    art: { props: [['nightcap', 44, 16, 46, -12], ['zzz', 80, 30, 22, 0]] },
     onEngineTurnStart(state) {
       if (state.moveCount > 0) {
         state.elo = clampElo(state.elo - 50);
@@ -146,7 +146,7 @@ const VARIANTS = {
       'by a random legal move: 0% at the start, +2% per move, capped at 80%.',
     baseElo: ELO_MAX,
     demo: [['♗d3', 'best', ''], ['♔e2', 'best', ''], ['♞a3', '??', '🎲']],
-    art: { transform: 'rotate(-24deg)', anim: 'wobble', acc: [['🍺',4,52,1.6,-10],['🫧',30,14,1.2,0]] },
+    art: { anim: 'wobble', props: [['beerMug', 76, 62, 30, 8], ['sunglasses', 46, 50, 44, -5]] },
     extraRandomChance(state) {
       // +2% per engine move played, capped at 80%.
       return Math.min(0.8, state.moveCount * 0.02);
@@ -169,7 +169,7 @@ const VARIANTS = {
       'you capture one of its pieces (max 3190).',
     baseElo: 200,
     demo: [['♟xe5', '400', '+200'], ['♞xc3', '600', '+200'], ['♝xb2', '800', '+200']],
-    art: { filter: 'saturate(2.4) hue-rotate(-40deg) contrast(1.15)', anim: 'shake', acc: [['💢',32,8,1.5,0],['💨',3,36,1.3,0]] },
+    art: { filter: 'saturate(2.2) hue-rotate(-35deg) contrast(1.1)', anim: 'shake', props: [['devilHorns', 48, 14, 46, 0], ['angerVeins', 78, 30, 17, 0]] },
     onPlayerMove(state, move) {
       if (move.captured) {
         state.elo = clampElo(state.elo + 200);
@@ -188,7 +188,7 @@ const VARIANTS = {
     description: 'Its Elo is re-rolled uniformly between 1320 and 3190 before each of its moves.',
     baseElo: Math.round((ELO_MIN + ELO_MAX) / 2),
     demo: [['♗d3', '1447', '🎲'], ['♔e2', '3102', '🎲'], ['♕g4', '1893', '🎲']],
-    art: { anim: 'bob', acc: [['🎲',33,10,1.5,-15],['🃏',6,8,1.4,15]] },
+    art: { anim: 'bob', props: [['sunglasses', 46, 50, 44, -4], ['dice', 78, 22, 20, 15], ['dice', 20, 70, 16, -12]] },
     onEngineTurnStart(state) {
       state.elo = ELO_MIN + Math.floor(Math.random() * (ELO_MAX - ELO_MIN + 1));
       return [`🎰 Rolled ${state.elo} Elo for this move`];
@@ -203,7 +203,7 @@ const VARIANTS = {
     description: 'Starts at 1600 Elo. Gains 150 Elo each time it gives check (max 3190).',
     baseElo: 1600,
     demo: [['♗b5+', '1750', '+150'], ['♕h5+', '1900', '+150'], ['♖e8+', '2050', '+150']],
-    art: { filter: 'grayscale(0.7) brightness(0.85)', acc: [['🩸',6,50,1.3,0],['🌊',34,58,1.4,0]] },
+    art: { filter: 'grayscale(0.55) contrast(1.1)', props: [['sharkFin', 52, 12, 34, 0], ['bloodDrip', 50, 2, 100, 0]] },
     onEngineMovePlayed(state, move, game) {
       if (game.in_check()) {
         state.elo = clampElo(state.elo + 150);
@@ -220,7 +220,7 @@ const VARIANTS = {
     description: 'Starts at 3190 Elo. Loses 300 Elo each time it captures one of your pieces.',
     baseElo: ELO_MAX,
     demo: [['♗xf6', '2890', '−300'], ['♘xd5', '2590', '−300'], ['♕xh7', '2290', '−300']],
-    art: { acc: [['🌸',25,7,1.4,0],['☮️',6,26,1.2,0]] },
+    art: { props: [['flower', 30, 22, 20, 0], ['halo', 50, 8, 50, -6]] },
     onEngineMovePlayed(state, move) {
       if (move && move.captured) {
         state.elo = clampElo(state.elo - 300);
@@ -243,7 +243,7 @@ const VARIANTS = {
     baseElo: ELO_MAX,
     eloLabel: () => '0.00',
     demo: [['♗d3', '+0.04', ''], ['♔e2', '−0.02', ''], ['♕g4', '0.00', '']],
-    art: { acc: [['🤝', 29, 8, 1.7, 0], ['⚖️', 6, 30, 1.2, 0]] },
+    art: { props: [['scales', 50, 20, 46, 0], ['bowTie', 44, 74, 30, -4]] },
     async pickMove(state, ctx) {
       const ranked = await ctx.engine.rankMoves(ctx.fen, ctx.legalCount);
       if (!ranked || !ranked.length) return null;
@@ -271,7 +271,7 @@ const VARIANTS = {
     baseElo: ELO_MAX,
     eloLabel: () => 'worst',
     demo: [['♖a8??', '−9.4', '↓'], ['♕xh7??', '−12.1', '↓'], ['♔e2??', '#−3', '↓']],
-    art: { filter: 'grayscale(0.85)', anim: 'wobble', acc: [['💀', 30, 7, 1.7, 0], ['📉', 6, 30, 1.2, 0]] },
+    art: { filter: 'grayscale(0.7)', anim: 'wobble', props: [['dunceCap', 46, 14, 30, -10], ['skull', 78, 62, 22, 8]] },
     async pickMove(state, ctx) {
       const ranked = await ctx.engine.rankMoves(ctx.fen, ctx.legalCount);
       if (!ranked || !ranked.length) return null;
@@ -295,7 +295,7 @@ const VARIANTS = {
       'Blunder deliberately at your own risk.',
     baseElo: ELO_MAX,
     demo: [['♖a8??', '2690', '−500'], ['♕xh7??', '2190', '−500'], ['♘g1??', '1690', '−500']],
-    art: { acc: [['😢', 30, 7, 1.6, 0], ['💧', 8, 30, 1.2, 0]] },
+    art: { props: [['tears', 44, 56, 22, 0], ['tissueBox', 78, 70, 28, -6]] },
     /** Needs the engine to rank every legal move, so this hook is async. */
     async onPlayerMoveAsync(state, ctx) {
       const { move, engine, fenBefore, legalCount } = ctx;
@@ -324,7 +324,7 @@ const VARIANTS = {
       'not the full engine, so it is beatable.',
     baseElo: null,
     demo: [['🐉d5', '♕+♘', ''], ['🐉xf7+', 'fork', '🎲'], ['🐉g6#', 'mate', '']],
-    art: { acc: [['🐉', 28, 6, 1.9, 0], ['🔥', 6, 30, 1.3, 0]] },
+    art: { filter: 'hue-rotate(35deg) saturate(1.3)', props: [['dragonWing', 74, 32, 42, -10], ['flame', 22, 62, 22, 12], ['devilHorns', 46, 16, 40, 0]] },
   },
 
   threecheckfish: {
@@ -338,7 +338,7 @@ const VARIANTS = {
       'chess and does not understand the rule — exploit that.',
     baseElo: 2200,
     demo: [['♗b5+', '✓', '+1'], ['♕h5+', '✓✓', '+1'], ['♖e8+', '✓✓✓', 'win']],
-    art: { acc: [['✅', 32, 6, 1.3, 0], ['✅', 20, 16, 1.3, 0], ['✅', 8, 26, 1.3, 0]] },
+    art: { props: [['crown', 46, 14, 38, -6], ['checkMarks', 82, 46, 16, 0]] },
     init(state) {
       state.playerChecks = 0;
       state.engineChecks = 0;
@@ -388,7 +388,7 @@ const VARIANTS = {
       'half of the board. Recovers as they leave.',
     baseElo: ELO_MAX,
     demo: [['♙e5', '3090', '−100'], ['♘f5', '2990', '−100'], ['♕h5', '2890', '−100']],
-    art: { anim: 'peek', acc: [['👀',34,6,1.4,0],['💦',10,24,1.1,15]] },
+    art: { anim: 'peek', props: [['shield', 26, 60, 34, -8], ['sweat', 72, 22, 12, 12]] },
     onEngineTurnStart(state, game) {
       const invaders = countInvaders(game, state.playerColor);
       state.elo = clampElo(this.baseElo - 100 * invaders);

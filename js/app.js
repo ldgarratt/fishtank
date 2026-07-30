@@ -1,5 +1,5 @@
 /* FishTank — main app: board UI, game loop, variant wiring. */
-/* global Chess, VARIANTS, randomMoveProbability, clampUciElo, ELO_MIN, ELO_MAX, SillyEngine, SoundBox, DragonMode, Analysis */
+/* global Chess, VARIANTS, randomMoveProbability, clampUciElo, ELO_MIN, ELO_MAX, SillyEngine, SoundBox, DragonMode, Analysis, FishArt */
 
 (() => {
   // cburnett SVG pieces (CC BY-SA 3.0) — same look locally and deployed:
@@ -20,7 +20,7 @@
     board: document.getElementById('board'),
     log: document.getElementById('log'),
     eloBar: document.getElementById('elo-bar'),
-    mood: document.getElementById('mood'),
+    avatar: document.getElementById('bot-avatar'),
     oppName: document.getElementById('opp-name'),
     oppDesc: document.getElementById('opp-desc'),
     status: document.getElementById('status'),
@@ -52,47 +52,14 @@
 
   /* ---------- variant picker ---------- */
 
-  function demoRows(v) {
-    return (v.demo || [])
-      .map(([move, elo, delta]) => {
-        let cls = 'ev-delta';
-        if (delta.startsWith('−') || delta.startsWith('-')) cls += ' neg';
-        else if (delta.startsWith('+')) cls += ' pos';
-        else if (delta) cls += ' dice';
-        return (
-          `<div class="ev"><span class="ev-move">${move}</span>` +
-          `<span class="ev-elo">${elo}</span>` +
-          `<span class="${cls}">${delta}</span></div>`
-        );
-      })
-      .join('');
-  }
-
   function buildPicker() {
     els.cards.innerHTML = '';
     for (const v of Object.values(VARIANTS)) {
       const card = document.createElement('button');
       card.className = 'card';
-      const art = v.art || {};
-      const fishStyle =
-        `transform:${art.transform || 'rotate(-12deg)'};` +
-        `filter:${art.filter || 'none'}`;
-      const accessories = (art.acc || [])
-        .map(
-          ([em, right, top, size, rot]) =>
-            `<span class="acc" style="right:${right}%;top:${top}%;` +
-            `font-size:${size}rem;transform:rotate(${rot}deg)">${em}</span>`
-        )
-        .join('');
       card.innerHTML =
-        `<div class="thumb">` +
-        `<div class="thumb-evals">${demoRows(v)}</div>` +
-        `<div class="fish-wrap ${art.anim || ''}">` +
-        `<img class="thumb-fish" style="${fishStyle}" src="img/stockfish.png" alt="" onerror="this.remove()">` +
-        `</div>` +
-        accessories +
-        `</div>` +
-        `<div class="card-name">${v.emoji} ${v.name}</div>` +
+        FishArt.cardArt(v) +
+        `<div class="card-name">${v.name}</div>` +
         `<div class="card-tag">${v.tagline}</div>`;
       card.addEventListener('click', () => startGame(v.id, true));
       els.cards.appendChild(card);
@@ -126,8 +93,8 @@
       els.game.classList.remove('hidden');
       els.oppDesc.textContent = variant.description;
       els.oppName.innerHTML =
-        `${variant.emoji} ${variant.name} <span class="opp-elo-inline">(beta)</span>`;
-      els.mood.textContent = variant.emoji;
+        `${variant.name} <span class="opp-elo-inline">(beta)</span>`;
+      els.avatar.innerHTML = FishArt.avatar(variant);
       els.eloBar.style.width = '100%';
       els.eloBar.className = 'elo-bar elo-mid';
       els.log.innerHTML = '';
@@ -161,6 +128,7 @@
     els.picker.classList.add('hidden');
     els.game.classList.remove('hidden');
     els.oppDesc.textContent = variant.description;
+    els.avatar.innerHTML = FishArt.avatar(variant);
     els.log.innerHTML = '';
     logEvent(`New game vs ${variant.name}. Starting Elo: ${vstate.elo}`);
     updateEloUI();
@@ -758,24 +726,13 @@
   function updateEloUI() {
     const label = variant.eloLabel ? variant.eloLabel(vstate) : Math.round(vstate.elo);
     els.oppName.innerHTML =
-      `${variant.emoji} ${variant.name} ` +
-      `<span class="opp-elo-inline">(${label})</span>`;
+      `${variant.name} <span class="opp-elo-inline">(${label})</span>`;
     const span = ELO_MAX - 800; // display floor at 800 so the bar can visibly empty
     const pct = Math.max(0, Math.min(1, (vstate.elo - 800) / span));
     els.eloBar.style.width = (pct * 100).toFixed(1) + '%';
     els.eloBar.className = 'elo-bar ' + (pct > 0.66 ? 'elo-high' : pct > 0.33 ? 'elo-mid' : 'elo-low');
-    els.mood.textContent = moodFor();
   }
 
-  function moodFor() {
-    const e = vstate.elo;
-    if (variant.id === 'gamblerfish') return '🎰';
-    if (e >= 3000) return variant.emoji === '😡' ? '🌋' : '🤖';
-    if (e >= 2400) return '😼';
-    if (e >= 1800) return '😐';
-    if (e >= 1320) return '😵‍💫';
-    return '🫠';
-  }
 
   function logMove(who, san) {
     const div = document.createElement('div');
