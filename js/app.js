@@ -2,16 +2,11 @@
 /* global Chess, VARIANTS, randomMoveProbability, clampUciElo, ELO_MIN, ELO_MAX, SillyEngine */
 
 (() => {
-  // cburnett SVG pieces (CC BY-SA 3.0): vendored locally by the deploy
-  // workflow, with lichess's copy on GitHub as a per-image fallback.
-  const CDN_PIECE_BASE =
-    'https://raw.githubusercontent.com/lichess-org/lila/master/public/piece/cburnett/';
-  let PIECE_BASE = 'img/pieces/';
-  {
-    const probe = new Image();
-    probe.onerror = () => { PIECE_BASE = CDN_PIECE_BASE; };
-    probe.src = 'img/pieces/wK.svg';
-  }
+  // Solid glyph pieces — bold, filled, classic look on every platform.
+  const UNICODE = {
+    wk: '♔', wq: '♕', wr: '♖', wb: '♗', wn: '♘', wp: '♙',
+    bk: '♚', bq: '♛', br: '♜', bb: '♝', bn: '♞', bp: '♟',
+  };
 
   const els = {
     picker: document.getElementById('picker'),
@@ -139,17 +134,10 @@
         cell.dataset.sq = sq;
         const piece = game.get(sq);
         if (piece) {
-          const name = piece.color + piece.type.toUpperCase() + '.svg';
-          const img = document.createElement('img');
-          img.className = 'piece-img';
-          img.alt = piece.color + piece.type;
-          img.draggable = false;
-          img.src = PIECE_BASE + name;
-          img.onerror = () => {
-            img.onerror = null;
-            img.src = CDN_PIECE_BASE + name;
-          };
-          cell.appendChild(img);
+          const span = document.createElement('span');
+          span.className = 'piece ' + (piece.color === 'w' ? 'white-piece' : 'black-piece');
+          span.textContent = UNICODE[piece.color + piece.type];
+          cell.appendChild(span);
         }
         if (selectedSquare === sq) cell.classList.add('selected');
         if (legalTargets.has(sq)) cell.classList.add(piece ? 'capture-target' : 'move-target');
