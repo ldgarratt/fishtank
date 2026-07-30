@@ -51,5 +51,16 @@ for f in Move.mp3 Capture.mp3 GenericNotify.mp3 Victory.mp3 Defeat.mp3 Draw.mp3;
     || { echo "warn: optional sound $f not found"; rm -f "../sound/$f"; }
 done
 
+# ffish.js — Fairy-Stockfish rules engine for the DragonFish (amazon) variant.
+# Optional: the app falls back to jsDelivr at runtime if these are missing.
+mkdir -p fairy
+if curl -fsSL -o fairy/ffish.js "https://cdn.jsdelivr.net/npm/ffish@0.7.5/ffish.js" &&
+   curl -fsSL -o fairy/ffish.wasm "https://cdn.jsdelivr.net/npm/ffish@0.7.5/ffish.wasm"; then
+  echo "ffish (DragonFish rules) downloaded"
+else
+  echo "warn: optional ffish not downloaded; DragonFish will use the CDN"
+  rm -f fairy/ffish.js fairy/ffish.wasm
+fi
+
 echo "Done. Files downloaded:"
 ls -lh stockfish-16.1-lite-single.* ../vendor/chess.js

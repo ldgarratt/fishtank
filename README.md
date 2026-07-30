@@ -21,6 +21,7 @@ installs. The app just adjusts the engine's strength settings between moves.
 | **PacifistFish** | 🕊️ | **Loses 300 Elo every time IT captures one of your pieces.** Bait it into trades. |
 | **CowardFish** | 🙈 | **Loses 100 Elo for each of your pieces on its half of the board.** March forward. |
 | **ThreeCheckFish** | ✅ | Fixed 2200 Elo, but **three-check rules: first side to give three checks wins.** It doesn't know the rule. |
+| **DragonFish** | 🐉 | **Amazon chess** (beta): each queen is a dragon that also moves like a knight. Rules by Fairy-Stockfish. |
 
 ## Play it
 
@@ -59,6 +60,21 @@ the app reconfigures Stockfish before every engine move:
   the feed.
 
 Weaker settings also get shorter think times, which keeps games quick.
+
+Note on accuracy: the browser build is a single-threaded WASM engine, so
+nominal ratings run a bit below their native-hardware calibration. Treat the
+displayed Elo as a good approximation, not a lab measurement.
+
+## DragonFish and fairy variants (beta)
+
+DragonFish plays [amazon chess](https://www.chessvariants.com/diffmove.dir/amazone.html)
+— both queens are "dragons" that combine queen and knight movement. Legal
+moves, checks, and mates come from [ffish.js](https://www.npmjs.com/package/ffish),
+the official Fairy-Stockfish binding, running in a web worker. Its opponent
+brain is a small built-in alpha-beta search rather than the full NNUE engine
+(the multithreaded Fairy-Stockfish WASM build needs SharedArrayBuffer, which
+GitHub Pages cannot enable without service-worker tricks) — so it plays a
+decent but beatable game. Upgrading it to the real engine is a known TODO.
 
 ## Publishing / deployment
 

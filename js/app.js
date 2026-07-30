@@ -1,5 +1,5 @@
 /* FishTank — main app: board UI, game loop, variant wiring. */
-/* global Chess, VARIANTS, randomMoveProbability, clampUciElo, ELO_MIN, ELO_MAX, SillyEngine, SoundBox */
+/* global Chess, VARIANTS, randomMoveProbability, clampUciElo, ELO_MIN, ELO_MAX, SillyEngine, SoundBox, DragonMode */
 
 (() => {
   // cburnett SVG pieces (CC BY-SA 3.0) — same look locally and deployed:
@@ -106,6 +106,38 @@
       history.pushState(null, '', '#' + variantId);
     }
     els.btnRematch.classList.add('hidden');
+
+    // Fairy variants (DragonFish) use their own rules engine and game loop.
+    if (variant.fairy) {
+      DragonMode.stop();
+      playerColor = els.sideSelect.value === 'b' ? 'b' : 'w';
+      game = null;
+      gameOver = false;
+      els.picker.classList.add('hidden');
+      els.game.classList.remove('hidden');
+      els.oppDesc.textContent = variant.description;
+      els.oppName.innerHTML =
+        `${variant.emoji} ${variant.name} <span class="opp-elo-inline">(beta)</span>`;
+      els.mood.textContent = variant.emoji;
+      els.eloBar.style.width = '100%';
+      els.eloBar.className = 'elo-bar elo-mid';
+      els.log.innerHTML = '';
+      logEvent(`New game vs ${variant.name}.`);
+      sound.play('start');
+      DragonMode.start(
+        els,
+        {
+          logMove,
+          logEvent,
+          setStatus,
+          playSound: (n) => sound.play(n),
+          onGameEnd: () => els.btnRematch.classList.remove('hidden'),
+        },
+        playerColor
+      );
+      return;
+    }
+    DragonMode.stop();
     playerColor = els.sideSelect.value === 'b' ? 'b' : 'w';
     vstate = { elo: variant.baseElo, moveCount: 0, playerColor };
     if (variant.init) variant.init(vstate);
@@ -395,8 +427,10 @@
   }
 
   function moveTimeFor(uciElo) {
-    // Weaker settings don't need long thinks; keeps the game snappy.
-    return uciElo >= 2600 ? 900 : uciElo >= 2000 ? 600 : 400;
+    // Always give the limiter full thinking time: UCI_Elo's calibration
+    // assumes it, and our single-threaded WASM build is already ~10x slower
+    // than native. Starving it makes nominal ratings play far below par.
+    return 1200;
   }
 
   function checkGameEnd() {
@@ -484,10 +518,10 @@
   }
 
   function logMove(who, san) {
-    const n = Math.ceil(game.history().length / 2);
     const div = document.createElement('div');
     div.className = 'log-move';
-    div.textContent = `${n}. ${who}: ${san}`;
+    const n = game ? Math.ceil(game.history().length / 2) + '. ' : '';
+    div.textContent = `${n}${who}: ${san}`;
     els.log.prepend(div);
   }
 
@@ -513,8 +547,12 @@
     els.btnNew.addEventListener('click', () => startGame(variant.id, false));
     els.btnRematch.addEventListener('click', () => startGame(variant.id, false));
     els.btnSwitch.addEventListener('click', goToPicker);
-    els.btnUndo.addEventListener('click', undo);
-    els.btnResign.addEventListener('click', resign);
+    els.btnUndo.addEventListener('click', () =>
+      variant && variant.fairy ? DragonMode.undo() : undo()
+    );
+    els.btnResign.addEventListener('click', () =>
+      variant && variant.fairy ? DragonMode.resign() : resign()
+    );
     window.addEventListener('popstate', applyLocation);
 
     const soundLabel = () => (sound.enabled ? '🔊 Sound' : '🔇 Muted');

@@ -203,6 +203,21 @@ const VARIANTS = {
     },
   },
 
+  dragonfish: {
+    id: 'dragonfish',
+    name: 'DragonFish',
+    emoji: '🐉',
+    fairy: true,
+    tagline: 'Dragon chess: each queen is a dragon that also moves like a knight.',
+    description:
+      'Amazon chess, with rules from Fairy-Stockfish: both queens are dragons ' +
+      '(queen + knight movement). Beta — the opponent is a built-in search, ' +
+      'not the full engine, so it is beatable.',
+    baseElo: null,
+    demo: [['🐉d5', '♕+♘', ''], ['🐉xf7+', 'fork', '🎲'], ['🐉g6#', 'mate', '']],
+    art: { acc: [['🐉', 28, 6, 1.9, 0], ['🔥', 6, 30, 1.3, 0]] },
+  },
+
   threecheckfish: {
     id: 'threecheckfish',
     name: 'ThreeCheckFish',

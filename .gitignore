@@ -1,6 +1,7 @@
 # Vendored engine/library files (downloaded at deploy time or via get-engine.sh)
 engine/stockfish-16.1-lite-single.js
 engine/stockfish-16.1-lite-single.wasm
+engine/fairy/
 vendor/chess.js
 img/stockfish.png
 img/pieces/
