@@ -6,7 +6,7 @@
 /* global Chess */
 
 const Analysis = (() => {
-  const DEPTH = 12;
+  const MOVETIME_MS = 400; // per position; fixed time, never fixed depth
   const MATE_CP = 10000;
 
   // Thresholds in centipawns lost (standard-ish classification).
@@ -68,7 +68,7 @@ const Analysis = (() => {
 
     const scored = [];
     for (let i = 0; i < fens.length; i++) {
-      scored.push(await engine.evaluate(fens[i], DEPTH));
+      scored.push(await engine.evaluate(fens[i], MOVETIME_MS));
       if (onProgress) onProgress(i + 1, fens.length);
     }
 
@@ -124,7 +124,7 @@ const Analysis = (() => {
     return { moves, summary, graph };
   }
 
-  return { run, classify, winPercent, moveAccuracy, CLASSES, DEPTH };
+  return { run, classify, winPercent, moveAccuracy, CLASSES, MOVETIME_MS };
 })();
 
 if (typeof module !== 'undefined' && module.exports) {

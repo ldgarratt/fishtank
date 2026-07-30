@@ -51,7 +51,7 @@ bash engine/get-engine.sh
 - **Copy PGN** — puts the full game on your clipboard with headers, ready to
   paste into lichess, chess.com, or a database.
 - **Analyse game** — replays the game through Stockfish at full strength
-  (depth 12) and reports accuracy percentages, average centipawn loss, and
+  and reports accuracy percentages, average centipawn loss, and
   every inaccuracy, mistake, and blunder with the move that was better,
   plus an evaluation graph. Same method lichess and chess.com use: each move
   is scored by how much winning chance it gave away.
@@ -63,12 +63,11 @@ the app reconfigures Stockfish before every engine move:
 
 - **1320–3190** — Stockfish's built-in limiter (`UCI_LimitStrength` +
   `UCI_Elo`) is used directly. This is the engine's supported range.
-- **Below 1320** — the limiter can't go lower, so the app uses the approach
-  [lichess uses for its weak AI levels](https://lichess.org/forum/general-chess-discussion/how-are-lichess-stockfish-levels-configured):
-  a **normal depth-5 search** paired with a low or negative **Skill Level**.
-  Rather than crippling the search (a depth-1 engine plays alien, not weak),
-  the engine looks at the position properly and then *chooses* among several
-  candidate moves with score noise that grows as the level drops.
+- **Below 1320** — the limiter can't go lower, so strength comes from a low or
+  negative **Skill Level** instead. This is how Stockfish's own Skill Level
+  works: it searches the position normally and then *chooses* among several
+  candidate moves with score noise that grows as the level drops. The search
+  itself is never crippled — a depth-limited engine plays alien, not weak.
 
   Classical Stockfish only accepts Skill Level 0–20; lichess reaches negative
   levels by running Fairy-Stockfish. FishTank keeps the stock engine and
@@ -79,6 +78,11 @@ the app reconfigures Stockfish before every engine move:
 
   Only below ~250 Elo is a little pure randomness (max 12%) mixed in; those
   moves are marked 🎲 in the feed.
+
+**Every search is time-limited, never depth-limited** — 1200 ms for a normal
+move, and the same budget when a bot ranks all legal moves (DrawFish,
+WorstFish). Fixed depth would make weak bots answer instantly and strong ones
+stall, and it makes strength depend on the machine.
 
   The gold standard for *human-like* weak play is
   [Maia](https://www.maiachess.com/), a neural net trained on millions of

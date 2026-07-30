@@ -5,9 +5,9 @@
  * Elo model:
  *   - Real Stockfish supports UCI_LimitStrength + UCI_Elo in [1320, 3190].
  *   - We track an effective elo in [100, 3190]. Within the engine's range it
- *     maps straight to UCI_Elo; below 1320 the engine uses a depth-5 search
- *     with low/negative Skill Level noise (see engine.js), the same approach
- *     lichess uses for its weak AI levels.
+ *     maps straight to UCI_Elo; below 1320 strength comes from low/negative
+ *     Skill Level noise over a normal time-limited search (see engine.js).
+ *   - Every search is time-limited, never depth-limited.
  */
 
 const ELO_MIN = 1320; // Stockfish's own UCI_Elo floor
@@ -23,9 +23,9 @@ function clampElo(elo) {
  * Chance of a completely random (non-engine) move.
  *
  * This used to prop up sub-1320 play, but the engine now models weak play
- * properly via Skill Level noise over a depth-5 MultiPV search (engine.js),
- * which produces plausible bad moves rather than absurd ones. Only the very
- * bottom of the scale keeps a small dose of pure chaos.
+ * properly via Skill Level noise over a MultiPV search (engine.js), which
+ * produces plausible bad moves rather than absurd ones. Only the very bottom
+ * of the scale keeps a small dose of pure chaos.
  */
 function randomMoveProbability(effectiveElo) {
   if (effectiveElo >= 250) return 0;
@@ -245,7 +245,7 @@ const VARIANTS = {
     demo: [['♗d3', '+0.04', ''], ['♔e2', '−0.02', ''], ['♕g4', '0.00', '']],
     art: { acc: [['🤝', 29, 8, 1.7, 0], ['⚖️', 6, 30, 1.2, 0]] },
     async pickMove(state, ctx) {
-      const ranked = await ctx.engine.rankMoves(ctx.fen, ctx.legalCount, 10);
+      const ranked = await ctx.engine.rankMoves(ctx.fen, ctx.legalCount);
       if (!ranked || !ranked.length) return null;
       let choice = ranked[0];
       for (const r of ranked) {
@@ -273,7 +273,7 @@ const VARIANTS = {
     demo: [['♖a8??', '−9.4', '↓'], ['♕xh7??', '−12.1', '↓'], ['♔e2??', '#−3', '↓']],
     art: { filter: 'grayscale(0.85)', anim: 'wobble', acc: [['💀', 30, 7, 1.7, 0], ['📉', 6, 30, 1.2, 0]] },
     async pickMove(state, ctx) {
-      const ranked = await ctx.engine.rankMoves(ctx.fen, ctx.legalCount, 8);
+      const ranked = await ctx.engine.rankMoves(ctx.fen, ctx.legalCount);
       if (!ranked || !ranked.length) return null;
       const choice = ranked[ranked.length - 1]; // rankMoves is best-first
       const evalText = (choice.score / 100).toFixed(2);
@@ -300,7 +300,7 @@ const VARIANTS = {
     async onPlayerMoveAsync(state, ctx) {
       const { move, engine, fenBefore, legalCount } = ctx;
       if (!engine || legalCount < 2) return;
-      const ranking = await engine.rankWorstMove(fenBefore, legalCount, 8);
+      const ranking = await engine.rankWorstMove(fenBefore, legalCount);
       if (!ranking || !ranking.worst) return;
       const played = move.from + move.to + (move.promotion || '');
       const worst = ranking.worst;

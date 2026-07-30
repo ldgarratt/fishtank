@@ -15,10 +15,10 @@
  * Weak-play model.
  *
  * Above 1320 Stockfish's own UCI_Elo limiter is calibrated and used directly.
- * Below it we follow the approach lichess uses for its AI levels 1-5:
- * a *normal-depth* search (depth 5 — not a crippled depth-1 one) combined with
- * a low or negative Skill Level, where the engine picks among several
- * candidate moves after adding score noise that grows as skill drops.
+ * Below it, strength comes from Skill Level noise over a normal time-limited
+ * search: the engine looks at the position properly, then picks among several
+ * candidate moves after adding score noise that grows as skill drops. This is
+ * how Stockfish's own Skill Level works — it never touches search depth.
  *
  * Classical Stockfish only accepts Skill Level 0-20; lichess gets negative
  * levels by running Fairy-Stockfish. We keep the stock engine and reproduce
@@ -29,7 +29,13 @@
  * (level 1 skill -9 ~ <400, level 2 skill -5 ~ 500, level 3 skill -1 ~ 800,
  * level 4 skill 3 ~ 1100, level 5 skill 7 ~ 1500).
  */
-const WEAK_DEPTH = 5; // lichess uses depth 5 for its weak AI levels
+// Every search is time-limited, never depth-limited: fixed depth makes weak
+// bots answer instantly and strong ones stall. Strength below the engine's
+// Elo floor comes from Skill Level noise instead (which is how Stockfish's own
+// Skill Level works — it searches normally and simply chooses badly).
+const MOVETIME_MS = 1200; // normal play
+const RANK_MOVETIME_MS = 1200; // ranking every legal move (DrawFish, WorstFish)
+const JUDGE_MOVETIME_MS = 800; // ranking to judge the player's move (PityFish)
 
 const SKILL_ANCHORS = [
   [100, -20],
@@ -116,7 +122,6 @@ class SillyEngine {
     this.sourceName = null;
     this.listeners = [];
     this.lastElo = null;
-    this.weakDepth = null;
     this.emulatedSkill = null;
   }
 
@@ -217,9 +222,9 @@ class SillyEngine {
   /**
    * Map an effective Elo to engine settings.
    *  - 1320..3190: Stockfish's own calibrated limiter.
-   *  - below 1320:  depth-5 search with a low/negative Skill Level, as lichess
-   *                 does for its weak AI levels. Non-negative skill is handled
-   *                 natively; negative skill is emulated in JS over MultiPV
+   *  - below 1320:  a low/negative Skill Level over a normal timed search.
+   *                 Non-negative skill is handled natively by the engine;
+   *                 negative skill is emulated in JS over MultiPV candidates
    *                 (see pickWithSkillNoise).
    */
   setStrength(effectiveElo) {
@@ -228,7 +233,6 @@ class SillyEngine {
     this.lastElo = elo;
 
     if (elo >= 1320) {
-      this.weakDepth = null;
       this.emulatedSkill = null;
       this.send('setoption name MultiPV value 1');
       this.send('setoption name Skill Level value 20');
@@ -238,7 +242,6 @@ class SillyEngine {
     }
 
     const skill = skillForElo(elo);
-    this.weakDepth = WEAK_DEPTH;
     this.send('setoption name UCI_LimitStrength value false');
     if (skill >= 0) {
       // Stock engine can do this itself.
@@ -255,17 +258,17 @@ class SillyEngine {
   /** Full strength, no limiter — used for post-game analysis. */
   setFullStrength() {
     this.lastElo = null; // force reconfiguration for the next game
-    this.weakDepth = null;
+    this.emulatedSkill = null;
     this.send('setoption name UCI_LimitStrength value false');
     this.send('setoption name Skill Level value 20');
   }
 
   /**
-   * Evaluate a position at fixed depth.
+   * Evaluate a position for a fixed time.
    * Resolves { cp, mate, best } where cp/mate are from the side-to-move's
    * perspective and best is the engine's preferred move in UCI notation.
    */
-  evaluate(fen, depth) {
+  evaluate(fen, movetimeMs) {
     return new Promise((resolve) => {
       let cp = 0;
       let mate = null;
@@ -288,7 +291,7 @@ class SillyEngine {
       };
       this.onLine(handler);
       this.send('position fen ' + fen);
-      this.send('go depth ' + depth);
+      this.send('go movetime ' + movetimeMs);
     });
   }
 
@@ -300,15 +303,15 @@ class SillyEngine {
    * Resolves an array of { move, score } sorted descending by score (from
    * the side-to-move's perspective), or null if unavailable.
    */
-  async rankMoves(fen, legalCount, depth) {
+  async rankMoves(fen, legalCount, movetimeMs = RANK_MOVETIME_MS) {
     if (!legalCount) return null;
-    const ranked = await this._rankFrom(fen, Math.min(250, legalCount), depth);
+    const ranked = await this._rankFrom(fen, Math.min(250, legalCount), movetimeMs);
     this.lastElo = null; // caller's strength settings were disturbed
     return ranked;
   }
 
   /** Shared MultiPV ranking. Leaves MultiPV back at 1. */
-  async _rankFrom(fen, multipv, depth) {
+  async _rankFrom(fen, multipv, movetimeMs) {
     this.send('setoption name UCI_LimitStrength value false');
     this.send('setoption name Skill Level value 20');
     this.send('setoption name MultiPV value ' + multipv);
@@ -338,7 +341,7 @@ class SillyEngine {
       };
       this.onLine(handler);
       this.send('position fen ' + fen);
-      this.send('go depth ' + depth);
+      this.send('go movetime ' + movetimeMs);
     });
 
     this.send('setoption name MultiPV value 1');
@@ -349,9 +352,9 @@ class SillyEngine {
   }
 
   /** Convenience wrapper: the lowest-ranked legal move. */
-  async rankWorstMove(fen, legalCount, depth) {
+  async rankWorstMove(fen, legalCount, movetimeMs = JUDGE_MOVETIME_MS) {
     if (!legalCount || legalCount < 2) return null;
-    const ranked = await this.rankMoves(fen, legalCount, depth);
+    const ranked = await this.rankMoves(fen, legalCount, movetimeMs);
     if (!ranked || !ranked.length) return null;
     return { worst: ranked[ranked.length - 1].move, ranked: ranked.length };
   }
@@ -362,7 +365,7 @@ class SillyEngine {
     // Stockfish's own skill-noise formula to choose among them.
     if (this.emulatedSkill !== null && this.emulatedSkill < 0) {
       const skill = this.emulatedSkill;
-      const ranked = await this._rankFrom(fen, multipvForSkill(skill), WEAK_DEPTH);
+      const ranked = await this._rankFrom(fen, multipvForSkill(skill), movetimeMs);
       if (ranked && ranked.length) {
         const chosen = pickWithSkillNoise(ranked, skill);
         if (chosen) return chosen;
@@ -382,7 +385,7 @@ class SillyEngine {
       };
       this.onLine(handler);
       this.send('position fen ' + fen);
-      this.send(this.weakDepth ? 'go depth ' + this.weakDepth : 'go movetime ' + movetimeMs);
+      this.send('go movetime ' + movetimeMs);
     });
   }
 }
@@ -394,6 +397,8 @@ if (typeof module !== 'undefined' && module.exports) {
     skillForElo,
     multipvForSkill,
     pickWithSkillNoise,
-    WEAK_DEPTH,
+    MOVETIME_MS,
+    RANK_MOVETIME_MS,
+    JUDGE_MOVETIME_MS,
   };
 }

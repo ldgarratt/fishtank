@@ -655,7 +655,7 @@
     els.analysis.classList.remove('hidden');
     els.analysis.innerHTML =
       '<h2>Analysis</h2><div class="an-progress"><div class="an-bar" style="width:0%"></div></div>' +
-      '<div class="an-note">Analysing at depth ' + Analysis.DEPTH + '…</div>';
+      '<div class="an-note">Analysing every position with Stockfish…</div>';
     const bar = els.analysis.querySelector('.an-bar');
 
     try {

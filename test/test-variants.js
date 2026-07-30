@@ -226,11 +226,23 @@ console.log('Random-move probability model');
 
 console.log('Weak-play model (lichess-style skill noise)');
 {
-  const { skillForElo, multipvForSkill, pickWithSkillNoise, WEAK_DEPTH } = require(path.join(
-    __dirname, '..', 'js', 'engine.js'
-  ));
+  const {
+    skillForElo, multipvForSkill, pickWithSkillNoise,
+    MOVETIME_MS, RANK_MOVETIME_MS, JUDGE_MOVETIME_MS,
+  } = require(path.join(__dirname, '..', 'js', 'engine.js'));
 
-  assert(WEAK_DEPTH === 5, 'weak play searches at depth 5, not depth 1');
+  // All searches are time-limited; nothing is capped by depth.
+  assert(MOVETIME_MS > 0, 'normal play uses a fixed time budget (' + MOVETIME_MS + 'ms)');
+  assert(RANK_MOVETIME_MS > 0, 'move ranking uses a fixed time budget');
+  assert(JUDGE_MOVETIME_MS > 0, 'move judging uses a fixed time budget');
+  const engineSrc = require('fs').readFileSync(
+    path.join(__dirname, '..', 'js', 'engine.js'), 'utf8'
+  );
+  assert(!/go depth/.test(engineSrc), 'engine never issues a fixed-depth search');
+  const analysisSrc = require('fs').readFileSync(
+    path.join(__dirname, '..', 'js', 'analysis.js'), 'utf8'
+  );
+  assert(!/DEPTH/.test(analysisSrc), 'analysis is time-based too');
 
   // Calibration anchors from lichess's published AI levels.
   assert(Math.round(skillForElo(400)) === -9, '400 Elo -> skill -9 (lichess level 1)');
