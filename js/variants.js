@@ -10,8 +10,14 @@
  *     Only far below the floor does a small random-move chance kick in.
  */
 
-const ELO_MIN = 1320;
-const ELO_MAX = 3190;
+const ELO_MIN = 1320; // Stockfish's own UCI_Elo floor
+const ELO_MAX = 3190; // Stockfish's own UCI_Elo ceiling
+const ELO_FLOOR = 100; // our floor: below this a rating is meaningless
+
+/** Keep an effective Elo inside [ELO_FLOOR, ELO_MAX]. */
+function clampElo(elo) {
+  return Math.max(ELO_FLOOR, Math.min(ELO_MAX, elo));
+}
 
 /**
  * Small residual chance of a totally random move at very low effective Elo.
@@ -85,7 +91,7 @@ const VARIANTS = {
     art: { anim: 'shake', acc: [['💦',27,6,1.4,20],['💦',7,32,1.1,-15],['❗',40,10,1.3,0]] },
     onPlayerMove(state, move, game) {
       if (game.in_check()) {
-        state.elo -= 200;
+        state.elo = clampElo(state.elo - 200);
         return [`♚ Check: −200 Elo → ${state.elo}`];
       }
     },
@@ -102,7 +108,7 @@ const VARIANTS = {
     art: { filter: 'saturate(1.8) hue-rotate(-25deg)', anim: 'shake', acc: [['💢',30,8,1.6,0]] },
     onPlayerMove(state, move) {
       if (move.captured) {
-        state.elo -= 200;
+        state.elo = clampElo(state.elo - 200);
         return [
           `${pieceName(move.captured)} captured: −200 Elo → ${state.elo}`,
         ];
@@ -121,7 +127,7 @@ const VARIANTS = {
     art: { transform: 'rotate(38deg)', acc: [['💤',28,6,1.5,0],['💤',14,20,1.1,0]] },
     onEngineTurnStart(state) {
       if (state.moveCount > 0) {
-        state.elo -= 50;
+        state.elo = clampElo(state.elo - 50);
         return [`😴 −50 Elo → ${state.elo}`];
       }
     },
@@ -163,7 +169,7 @@ const VARIANTS = {
     art: { filter: 'saturate(2.4) hue-rotate(-40deg) contrast(1.15)', anim: 'shake', acc: [['💢',32,8,1.5,0],['💨',3,36,1.3,0]] },
     onPlayerMove(state, move) {
       if (move.captured) {
-        state.elo = Math.min(ELO_MAX, state.elo + 200);
+        state.elo = clampElo(state.elo + 200);
         return [
           `${pieceName(move.captured)} captured: +200 Elo → ${state.elo}`,
         ];
@@ -197,7 +203,7 @@ const VARIANTS = {
     art: { filter: 'grayscale(0.7) brightness(0.85)', acc: [['🩸',6,50,1.3,0],['🌊',34,58,1.4,0]] },
     onEngineMovePlayed(state, move, game) {
       if (game.in_check()) {
-        state.elo = Math.min(ELO_MAX, state.elo + 150);
+        state.elo = clampElo(state.elo + 150);
         return [`🦈 Check given: +150 Elo → ${state.elo}`];
       }
     },
@@ -214,7 +220,7 @@ const VARIANTS = {
     art: { acc: [['🌸',25,7,1.4,0],['☮️',6,26,1.2,0]] },
     onEngineMovePlayed(state, move) {
       if (move && move.captured) {
-        state.elo -= 300;
+        state.elo = clampElo(state.elo - 300);
         return [
           `🕊️ It captured your ${pieceName(move.captured)}: −300 Elo → ${state.elo}`,
         ];
@@ -272,7 +278,7 @@ const VARIANTS = {
       const worst = ranking.worst;
       // Compare ignoring promotion suffix mismatches (e.g. "e7e8q" vs "e7e8").
       if (played === worst || played.slice(0, 4) === worst.slice(0, 4)) {
-        state.elo -= 500;
+        state.elo = clampElo(state.elo - 500);
         return [`😢 ${move.san} was the worst move available: −500 Elo → ${state.elo}`];
       }
     },
@@ -357,7 +363,7 @@ const VARIANTS = {
     art: { anim: 'peek', acc: [['👀',34,6,1.4,0],['💦',10,24,1.1,15]] },
     onEngineTurnStart(state, game) {
       const invaders = countInvaders(game, state.playerColor);
-      state.elo = this.baseElo - 100 * invaders;
+      state.elo = clampElo(this.baseElo - 100 * invaders);
       if (invaders !== (state.lastInvaders || 0)) {
         state.lastInvaders = invaders;
         if (invaders > 0) {
@@ -379,5 +385,8 @@ function pieceName(p) {
 
 // Export for node-based tests.
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { VARIANTS, randomMoveProbability, clampUciElo, countInvaders, ELO_MIN, ELO_MAX };
+  module.exports = {
+    VARIANTS, randomMoveProbability, clampUciElo, clampElo, countInvaders,
+    ELO_MIN, ELO_MAX, ELO_FLOOR,
+  };
 }

@@ -70,7 +70,9 @@ the app reconfigures Stockfish before every engine move:
   random-move chance (up to 30%) is mixed in; those moves are marked 🎲 in
   the feed.
 
-Weaker settings also get shorter think times, which keeps games quick.
+Effective Elo is clamped to **100–3190**, so a bot that keeps draining (a
+long game against TiredFish, say) bottoms out at 100 rather than going
+negative.
 
 Note on accuracy: the browser build is a single-threaded WASM engine, so
 nominal ratings run a bit below their native-hardware calibration. Treat the

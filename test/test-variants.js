@@ -1,7 +1,9 @@
 /* Unit tests for variant Elo logic. Run: node test/test-variants.js */
 
 const path = require('path');
-const { VARIANTS, randomMoveProbability, clampUciElo, ELO_MIN, ELO_MAX } = require(path.join(
+const {
+  VARIANTS, randomMoveProbability, clampUciElo, clampElo, ELO_MIN, ELO_MAX, ELO_FLOOR,
+} = require(path.join(
   __dirname,
   '..',
   'js',
@@ -175,6 +177,39 @@ console.log('ThreeCheckFish');
   assert(v.kingLives(s2, mateOnEngine).w === 2, 'winner keeps remaining lives');
   const mateOnPlayer = { in_checkmate: () => true, turn: () => 'w' };
   assert(v.kingLives(s2, mateOnPlayer).w === 0, 'mated player king shows 0 lives');
+}
+
+console.log('Elo never goes below the floor');
+{
+  assert(clampElo(-500) === ELO_FLOOR, 'clampElo floors negatives at ' + ELO_FLOOR);
+  assert(clampElo(99999) === ELO_MAX, 'clampElo caps at ' + ELO_MAX);
+
+  // TiredFish: -50/move; a long game must not produce a negative rating.
+  const t = VARIANTS.tiredfish;
+  const st = { elo: t.baseElo, moveCount: 1 };
+  for (let i = 1; i <= 200; i++) {
+    st.moveCount = i;
+    t.onEngineTurnStart(st);
+  }
+  assert(st.elo === ELO_FLOOR, '200 tired moves floor at ' + ELO_FLOOR + ' (was going negative)');
+
+  // Same for the other draining variants.
+  const p = VARIANTS.panicfish;
+  const sp = { elo: p.baseElo, moveCount: 0 };
+  for (let i = 0; i < 40; i++) p.onPlayerMove(sp, quiet, inCheck);
+  assert(sp.elo === ELO_FLOOR, '40 checks floor PanicFish at ' + ELO_FLOOR);
+
+  const pac = VARIANTS.pacifistfish;
+  const spac = { elo: pac.baseElo, moveCount: 0 };
+  for (let i = 0; i < 40; i++) pac.onEngineMovePlayed(spac, capture, notInCheck);
+  assert(spac.elo === ELO_FLOOR, 'PacifistFish floors too');
+
+  const cow = VARIANTS.cowardfish;
+  const board = {};
+  for (const f of 'abcdefgh') for (const r of [5, 6, 7, 8]) board[f + r] = { color: 'w', type: 'q' };
+  const scow = { elo: cow.baseElo, moveCount: 0, playerColor: 'w' };
+  cow.onEngineTurnStart(scow, { get: (sq) => board[sq] || null });
+  assert(scow.elo >= ELO_FLOOR, 'CowardFish with 32 invaders stays >= floor (' + scow.elo + ')');
 }
 
 console.log('Random-move probability model');
