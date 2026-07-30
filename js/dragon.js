@@ -134,6 +134,7 @@ const DragonMode = (() => {
         const sq = 'abcdefgh'[ff] + (8 - rr);
         const cell = document.createElement('div');
         cell.className = 'sq ' + ((rr + ff) % 2 === 0 ? 'light' : 'dark');
+        cell.dataset.sq = sq;
         const ch = map[sq];
         if (ch) cell.appendChild(pieceEl(ch));
         if (selected === sq) cell.classList.add('selected');
@@ -150,13 +151,62 @@ const DragonMode = (() => {
           cell.classList.add('in-check');
         }
         cell.addEventListener('click', () => onClick(sq, ch));
+        if (ch && (ch === ch.toUpperCase() ? 'w' : 'b') === playerColor) {
+          cell.addEventListener('pointerdown', (e) => startDrag(e, sq, ch, cell));
+        }
         els.board.appendChild(cell);
       }
     }
   }
 
+  function startDrag(e, sq, ch, cell) {
+    if (!active || gameOver || thinking || !state || state.turn !== playerColor) return;
+    if (e.button !== undefined && e.button !== 0) return;
+    e.preventDefault();
+    selected = sq;
+    els.board.querySelectorAll('.sq').forEach((c) =>
+      c.classList.remove('selected', 'move-target', 'capture-target')
+    );
+    cell.classList.add('selected');
+    for (const m of state.moves.filter((mv) => mv.startsWith(sq))) {
+      const t = els.board.querySelector(`.sq[data-sq="${m.slice(2, 4)}"]`);
+      if (t) t.classList.add(t.querySelector('.piece-img, .dragon-piece') ? 'capture-target' : 'move-target');
+    }
+    const pieceNode = cell.querySelector('.piece-img, .dragon-piece');
+    let ghost = null;
+    const size = cell.getBoundingClientRect().width;
+    const onMove = (ev) => {
+      if (!ghost && pieceNode) {
+        ghost = pieceNode.cloneNode(true);
+        ghost.classList.add('drag-ghost');
+        ghost.style.width = size + 'px';
+        ghost.style.height = size + 'px';
+        document.body.appendChild(ghost);
+        pieceNode.style.opacity = '0.35';
+      }
+      if (ghost) {
+        ghost.style.left = ev.clientX - size / 2 + 'px';
+        ghost.style.top = ev.clientY - size / 2 + 'px';
+      }
+    };
+    const onUp = (ev) => {
+      document.removeEventListener('pointermove', onMove);
+      document.removeEventListener('pointerup', onUp);
+      if (ghost) ghost.remove();
+      if (pieceNode) pieceNode.style.opacity = '';
+      const el = document.elementFromPoint(ev.clientX, ev.clientY);
+      const dropCell = el && el.closest ? el.closest('.sq') : null;
+      const dropSq = dropCell && dropCell.dataset ? dropCell.dataset.sq : null;
+      if (dropSq && dropSq !== sq) onClick(dropSq, null);
+      else render();
+    };
+    document.addEventListener('pointermove', onMove);
+    document.addEventListener('pointerup', onUp);
+  }
+
   function onClick(sq, ch) {
     if (!active || gameOver || thinking || !state || state.turn !== playerColor) return;
+    if (ch === null) ch = fenToMap(state.fen)[sq] || undefined;
     const mine = ch && (ch === ch.toUpperCase() ? 'w' : 'b') === playerColor;
     if (selected) {
       if (sq === selected) {

@@ -230,6 +230,9 @@
           cell.classList.add('in-check');
         }
         cell.addEventListener('click', () => onSquareClick(sq));
+        if (piece && piece.color === playerColor) {
+          cell.addEventListener('pointerdown', (e) => startDrag(e, sq, cell));
+        }
         els.board.appendChild(cell);
       }
     }
@@ -288,6 +291,62 @@
       selectedSquare = null;
     }
     renderBoard();
+  }
+
+  /* ---------- drag and drop ---------- */
+
+  function startDrag(e, sq, cell) {
+    if (gameOver || pendingPromo || !game) return;
+    if (e.button !== undefined && e.button !== 0) return;
+    e.preventDefault();
+
+    // Select immediately and mark legal targets in place (no rebuild — that
+    // would destroy the elements mid-gesture).
+    selectedSquare = sq;
+    els.board.querySelectorAll('.sq').forEach((c) => {
+      c.classList.remove('selected', 'move-target', 'capture-target');
+    });
+    cell.classList.add('selected');
+    for (const m of game.moves({ square: sq, verbose: true })) {
+      const target = els.board.querySelector(`.sq[data-sq="${m.to}"]`);
+      if (target) target.classList.add(target.querySelector('.piece-img') ? 'capture-target' : 'move-target');
+    }
+
+    const pieceImg = cell.querySelector('.piece-img, .piece');
+    let ghost = null;
+    const size = cell.getBoundingClientRect().width;
+    const place = (ev) => {
+      if (!ghost) return;
+      ghost.style.left = ev.clientX - size / 2 + 'px';
+      ghost.style.top = ev.clientY - size / 2 + 'px';
+    };
+    const onMove = (ev) => {
+      if (!ghost && pieceImg) {
+        ghost = pieceImg.cloneNode(true);
+        ghost.className = 'drag-ghost';
+        ghost.style.width = size + 'px';
+        ghost.style.height = size + 'px';
+        document.body.appendChild(ghost);
+        pieceImg.style.opacity = '0.35';
+      }
+      place(ev);
+    };
+    const onUp = (ev) => {
+      document.removeEventListener('pointermove', onMove);
+      document.removeEventListener('pointerup', onUp);
+      if (ghost) ghost.remove();
+      if (pieceImg) pieceImg.style.opacity = '';
+      const el = document.elementFromPoint(ev.clientX, ev.clientY);
+      const dropCell = el && el.closest ? el.closest('.sq') : null;
+      const dropSq = dropCell && dropCell.dataset ? dropCell.dataset.sq : null;
+      if (dropSq && dropSq !== sq) {
+        onSquareClick(dropSq); // executes move / premove / promotion flow
+      } else {
+        renderBoard(); // plain tap: piece stays selected for click-to-move
+      }
+    };
+    document.addEventListener('pointermove', onMove);
+    document.addEventListener('pointerup', onUp);
   }
 
   /* ---------- promotion picker ---------- */
@@ -553,6 +612,10 @@
     els.btnResign.addEventListener('click', () =>
       variant && variant.fairy ? DragonMode.resign() : resign()
     );
+    document.getElementById('home-link').addEventListener('click', (e) => {
+      e.preventDefault();
+      goToPicker();
+    });
     window.addEventListener('popstate', applyLocation);
 
     const soundLabel = () => (sound.enabled ? '🔊 Sound' : '🔇 Muted');

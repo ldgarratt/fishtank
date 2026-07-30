@@ -55,6 +55,19 @@ function countInvaders(game, playerColor) {
 }
 
 const VARIANTS = {
+  stockfish: {
+    id: 'stockfish',
+    name: 'Stockfish',
+    emoji: '🐟',
+    tagline: 'The real thing. Full strength, no gimmicks.',
+    description:
+      'Plain Stockfish at its maximum limiter setting (3190 Elo). ' +
+      'Its strength never changes. Good luck.',
+    baseElo: ELO_MAX,
+    demo: [['♗d3', '3190', ''], ['♔e2', '3190', ''], ['♕g4', '3190', '']],
+    art: {},
+  },
+
   panicfish: {
     id: 'panicfish',
     name: 'PanicFish',
