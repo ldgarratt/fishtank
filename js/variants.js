@@ -267,6 +267,14 @@ const VARIANTS = {
         return { winner: 'engine', msg: '💀 ThreeCheckFish delivered three checks — it wins.' };
       }
     },
+    kingLives(state) {
+      // Lives badge on each king: 3 minus checks received.
+      const playerLives = 3 - (state.engineChecks || 0);
+      const engineLives = 3 - (state.playerChecks || 0);
+      return state.playerColor === 'w'
+        ? { w: playerLives, b: engineLives }
+        : { w: engineLives, b: playerLives };
+    },
   },
 
   cowardfish: {

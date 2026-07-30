@@ -62,5 +62,21 @@ else
   rm -f fairy/ffish.js fairy/ffish.wasm
 fi
 
+# Full Fairy-Stockfish NNUE engine (multithreaded WASM). Needs SharedArrayBuffer,
+# enabled on GitHub Pages via coi-serviceworker. All optional — DragonFish
+# falls back to its built-in lite search when these are missing.
+FSF="https://cdn.jsdelivr.net/npm/fairy-stockfish-nnue.wasm"
+if curl -fsSL -o fairy/stockfish.js "$FSF/stockfish.js" &&
+   curl -fsSL -o fairy/stockfish.wasm "$FSF/stockfish.wasm" &&
+   curl -fsSL -o fairy/stockfish.worker.js "$FSF/stockfish.worker.js"; then
+  echo "fairy-stockfish engine downloaded"
+else
+  echo "warn: optional fairy-stockfish engine not downloaded"
+  rm -f fairy/stockfish.js fairy/stockfish.wasm fairy/stockfish.worker.js
+fi
+curl -fsSL -o ../coi-serviceworker.js \
+  "https://cdn.jsdelivr.net/npm/coi-serviceworker/coi-serviceworker.min.js" \
+  || { echo "warn: coi-serviceworker not downloaded"; rm -f ../coi-serviceworker.js; }
+
 echo "Done. Files downloaded:"
 ls -lh stockfish-16.1-lite-single.* ../vendor/chess.js

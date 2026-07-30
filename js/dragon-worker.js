@@ -208,7 +208,7 @@ self.onmessage = (e) => {
       const info = describeMove(msg.uci);
       board.push(msg.uci);
       pushCount++;
-      post(stateMsg({ playerMove: info }));
+      post(stateMsg(msg.byEngine ? { engineMove: info } : { playerMove: info }));
     } else if (msg.type === 'think') {
       const uci = think();
       if (uci) {

@@ -166,6 +166,19 @@ main { flex: 1; width: 100%; max-width: 1280px; margin: 0 auto; padding: 12px 24
   position: fixed; z-index: 60; pointer-events: none;
   filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.5));
 }
+
+/* Three-check: remaining lives badge on each king */
+.king-lives {
+  position: absolute; top: 3px; right: 3px; z-index: 3;
+  width: 19px; height: 19px;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(18, 20, 30, 0.88);
+  color: #fff; font-size: 0.72rem; font-weight: 800;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  pointer-events: none;
+}
+.king-lives-low { background: #c62828; border-color: #ffcdd2; }
 .sq.light { background: var(--light-sq); }
 .sq.dark { background: var(--dark-sq); }
 .sq.last-move::before { content: ''; position: absolute; inset: 0; background: var(--last); }

@@ -3,8 +3,11 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <!-- Enables SharedArrayBuffer on GitHub Pages (for the full Fairy-Stockfish
+       engine). Harmless 404 when the file isn't vendored. -->
+  <script src="coi-serviceworker.js"></script>
   <title>FishTank — Stockfish variants with mood swings</title>
-  <link rel="stylesheet" href="css/style.css?v=11" />
+  <link rel="stylesheet" href="css/style.css?v=12" />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80'>🐟</text></svg>" />
 </head>
 <body>
@@ -101,11 +104,12 @@
         ['vendor/chess.js',
          'https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js',
          'https://cdn.jsdelivr.net/npm/chess.js@0.10.3/chess.js'],
-        ['js/variants.js?v=11'],
-        ['js/engine.js?v=11'],
-        ['js/sound.js?v=11'],
-        ['js/dragon.js?v=11'],
-        ['js/app.js?v=11'],
+        ['js/variants.js?v=12'],
+        ['js/engine.js?v=12'],
+        ['js/sound.js?v=12'],
+        ['js/fairy-engine.js?v=12'],
+        ['js/dragon.js?v=12'],
+        ['js/app.js?v=12'],
       ]);
     })();
   </script>

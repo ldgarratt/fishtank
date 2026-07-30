@@ -3,7 +3,7 @@
  * from FEN, handles clicks against the worker-provided legal move list, and
  * relays sounds/feed events. Completely independent of the chess.js game flow.
  */
-/* global sound */
+/* global sound, FairyEngine */
 
 const DragonMode = (() => {
   let worker = null;
@@ -16,13 +16,14 @@ const DragonMode = (() => {
   let playerColor = 'w';
   let thinking = false;
   let gameOver = false;
+  let brainAnnounced = false;
 
   const DRAGON_CDN_PIECES =
     'https://raw.githubusercontent.com/lichess-org/lila/master/public/piece/cburnett/';
 
   function ensureWorker() {
     if (worker) return;
-    worker = new Worker('js/dragon-worker.js?v=10');
+    worker = new Worker('js/dragon-worker.js?v=12');
     worker.onmessage = (e) => handleMsg(e.data);
     worker.onerror = (e) => {
       hooks.setStatus('🐉 DragonFish failed to load: ' + (e.message || 'worker error'));
@@ -74,10 +75,40 @@ const DragonMode = (() => {
     if (msg.turn !== playerColor && !thinking) {
       thinking = true;
       hooks.setStatus('🐉 DragonFish is thinking…');
-      worker.postMessage({ type: 'think' });
+      engineTurn(msg);
     } else if (msg.turn === playerColor) {
       hooks.setStatus('Your move.');
     }
+  }
+
+  async function engineTurn(snapshot) {
+    let usedFull = false;
+    try {
+      if (await FairyEngine.ready()) {
+        const uci = await FairyEngine.bestMove(snapshot.fen, 900);
+        if (uci && snapshot.moves.indexOf(uci) !== -1) {
+          usedFull = true;
+          announceBrain(true);
+          worker.postMessage({ type: 'push', uci, byEngine: true });
+        }
+      }
+    } catch (e) {
+      console.warn('Fairy engine move failed, using lite search:', e);
+    }
+    if (!usedFull) {
+      announceBrain(false);
+      worker.postMessage({ type: 'think' });
+    }
+  }
+
+  function announceBrain(full) {
+    if (brainAnnounced) return;
+    brainAnnounced = true;
+    hooks.logEvent(
+      full
+        ? '🐉 Full Fairy-Stockfish engine active.'
+        : '🐉 Using built-in lite search (full engine unavailable in this browser).'
+    );
   }
 
   /* ---------- rendering ---------- */
@@ -246,6 +277,8 @@ const DragonMode = (() => {
       thinking = false;
       gameOver = false;
       ensureWorker();
+      FairyEngine.ready(); // warm up the full engine in the background
+      FairyEngine.newGame();
       hooks.setStatus('🐉 Loading Fairy-Stockfish rules…');
       if (state) {
         worker.postMessage({ type: 'new' });

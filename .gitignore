@@ -2,6 +2,7 @@
 engine/stockfish-16.1-lite-single.js
 engine/stockfish-16.1-lite-single.wasm
 engine/fairy/
+coi-serviceworker.js
 vendor/chess.js
 img/stockfish.png
 img/pieces/

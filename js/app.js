@@ -221,6 +221,13 @@
             img.src = CDN_PIECE_BASE + name;
           };
           cell.appendChild(img);
+          if (piece.type === 'k' && variant && variant.kingLives) {
+            const lives = variant.kingLives(vstate)[piece.color];
+            const badge = document.createElement('span');
+            badge.className = 'king-lives' + (lives <= 1 ? ' king-lives-low' : '');
+            badge.textContent = lives;
+            cell.appendChild(badge);
+          }
         }
         if (selectedSquare === sq) cell.classList.add('selected');
         if (premove && (premove.from === sq || premove.to === sq)) cell.classList.add('premove');

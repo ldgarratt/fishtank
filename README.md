@@ -70,11 +70,16 @@ displayed Elo as a good approximation, not a lab measurement.
 DragonFish plays [amazon chess](https://www.chessvariants.com/diffmove.dir/amazone.html)
 — both queens are "dragons" that combine queen and knight movement. Legal
 moves, checks, and mates come from [ffish.js](https://www.npmjs.com/package/ffish),
-the official Fairy-Stockfish binding, running in a web worker. Its opponent
-brain is a small built-in alpha-beta search rather than the full NNUE engine
-(the multithreaded Fairy-Stockfish WASM build needs SharedArrayBuffer, which
-GitHub Pages cannot enable without service-worker tricks) — so it plays a
-decent but beatable game. Upgrading it to the real engine is a known TODO.
+the official Fairy-Stockfish binding, running in a web worker.
+
+Its opponent brain is the full
+[Fairy-Stockfish NNUE WASM engine](https://www.npmjs.com/package/fairy-stockfish-nnue.wasm)
+where the browser allows it. That build needs SharedArrayBuffer, which
+requires cross-origin isolation; on GitHub Pages this is enabled by
+[coi-serviceworker](https://github.com/gzuidhof/coi-serviceworker) (vendored
+at deploy time — it may trigger one automatic page reload on first visit).
+If isolation isn't available, DragonFish silently falls back to a built-in
+lite alpha-beta search; the feed tells you which brain is active.
 
 ## Publishing / deployment
 

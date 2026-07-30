@@ -161,6 +161,14 @@ console.log('ThreeCheckFish');
   v.onEngineMovePlayed(s, quiet, inCheck);
   v.onEngineMovePlayed(s, quiet, inCheck);
   assert(v.checkCustomEnd(s).winner === 'engine', 'three engine checks loses');
+
+  const s2 = { elo: v.baseElo, moveCount: 0, playerColor: 'w' };
+  v.init(s2);
+  assert(v.kingLives(s2).w === 3 && v.kingLives(s2).b === 3, 'both kings start with 3 lives');
+  v.onPlayerMove(s2, quiet, inCheck); // player checks the engine
+  assert(v.kingLives(s2).b === 2 && v.kingLives(s2).w === 3, 'engine king loses a life');
+  v.onEngineMovePlayed(s2, quiet, inCheck); // engine checks the player
+  assert(v.kingLives(s2).w === 2, 'player king loses a life');
 }
 
 console.log('Random-move probability model');
