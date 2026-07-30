@@ -37,7 +37,10 @@ console.log('PanicFish');
   for (let i = 0; i < 12; i++) v.onPlayerMove(s, quiet, inCheck);
   assert(s.elo === ELO_MAX - 13 * 200, '13 checks -> ' + s.elo + ' (goes below engine floor)');
   assert(clampUciElo(s.elo) === ELO_MIN, 'uci elo clamps at floor');
-  assert(randomMoveProbability(s.elo) > 0, 'below floor -> random move chance');
+  assert(
+    randomMoveProbability(s.elo) === 0,
+    'below the engine floor it still plays real (skill-noised) moves, not random ones'
+  );
 }
 
 console.log('TiltFish');
@@ -81,7 +84,7 @@ console.log('RageFish');
   const s = { elo: v.baseElo, moveCount: 0 };
   assert(v.baseElo === 200, 'starts at 200 Elo (way below engine floor)');
   const p200 = randomMoveProbability(200);
-  assert(p200 > 0.2 && p200 < 0.3, 'small random-move chance at 200 (' + p200.toFixed(3) + ')');
+  assert(p200 > 0 && p200 <= 0.12, 'a little pure chaos at 200 Elo (' + p200.toFixed(3) + ')');
   v.onPlayerMove(s, capture, notInCheck);
   assert(s.elo === 400, 'capture enrages +200');
   for (let i = 0; i < 50; i++) v.onPlayerMove(s, capture, notInCheck);
@@ -215,10 +218,61 @@ console.log('Elo never goes below the floor');
 console.log('Random-move probability model');
 {
   assert(randomMoveProbability(ELO_MIN) === 0, 'no random moves at engine floor');
-  assert(randomMoveProbability(700) === 0, 'no random moves at 700+ (depth/skill handle it)');
-  assert(randomMoveProbability(0) === 0.3, 'capped at 30%');
+  assert(randomMoveProbability(250) === 0, 'no random moves at 250+ (skill noise handles it)');
+  assert(randomMoveProbability(0) === 0.12, 'capped at 12% at the very bottom');
   assert(clampUciElo(99999) === ELO_MAX, 'clamp upper');
   assert(clampUciElo(-5) === ELO_MIN, 'clamp lower');
+}
+
+console.log('Weak-play model (lichess-style skill noise)');
+{
+  const { skillForElo, multipvForSkill, pickWithSkillNoise, WEAK_DEPTH } = require(path.join(
+    __dirname, '..', 'js', 'engine.js'
+  ));
+
+  assert(WEAK_DEPTH === 5, 'weak play searches at depth 5, not depth 1');
+
+  // Calibration anchors from lichess's published AI levels.
+  assert(Math.round(skillForElo(400)) === -9, '400 Elo -> skill -9 (lichess level 1)');
+  assert(Math.round(skillForElo(500)) === -5, '500 Elo -> skill -5 (level 2)');
+  assert(Math.round(skillForElo(800)) === -1, '800 Elo -> skill -1 (level 3)');
+  assert(Math.round(skillForElo(1100)) === 3, '1100 Elo -> skill 3 (level 4)');
+  assert(skillForElo(100) === -20, 'floor Elo -> skill -20');
+  assert(skillForElo(3000) === 7, 'clamped at the top anchor');
+  assert(skillForElo(650) > skillForElo(450), 'monotonic in Elo');
+
+  assert(multipvForSkill(3) === 4, 'non-negative skill considers 4 candidates (Stockfish default)');
+  assert(multipvForSkill(-20) > 4, 'very weak play considers a wider candidate set');
+  assert(multipvForSkill(-20) <= 12, 'candidate set stays bounded');
+
+  // Behavioural check: strong settings pick the best move far more often.
+  const ranked = [
+    { move: 'best', score: 60 },
+    { move: 'ok', score: 20 },
+    { move: 'meh', score: -40 },
+    { move: 'awful', score: -260 },
+  ];
+  const rate = (skill, n = 4000) => {
+    let top = 0;
+    for (let i = 0; i < n; i++) if (pickWithSkillNoise(ranked, skill) === 'best') top++;
+    return top / n;
+  };
+  const strong = rate(15);
+  const weak = rate(-20);
+  assert(strong > weak, `skill 15 plays the best move more than skill -20 (${(strong * 100).toFixed(0)}% vs ${(weak * 100).toFixed(0)}%)`);
+  assert(weak < 0.5, 'very weak skill often rejects the best move');
+
+  let seen = new Set();
+  for (let i = 0; i < 500; i++) seen.add(pickWithSkillNoise(ranked, -20));
+  assert(seen.size > 1, 'weak play spreads across several candidate moves');
+  for (const m of seen) {
+    if (!ranked.some((r) => r.move === m)) {
+      failures++;
+      console.error('  FAIL - picked a move outside the candidate list: ' + m);
+    }
+  }
+  assert(true, 'only ever picks legal candidate moves');
+  assert(pickWithSkillNoise([], -5) === null, 'empty candidate list is handled');
 }
 
 async function testPityFish() {

@@ -62,13 +62,28 @@ the app reconfigures Stockfish before every engine move:
 
 - **1320–3190** — Stockfish's built-in limiter (`UCI_LimitStrength` +
   `UCI_Elo`) is used directly. This is the engine's supported range.
-- **Below 1320** — the limiter can't go lower, so the app switches to
-  Stockfish's `Skill Level` option (which adds move randomization) combined
-  with a shallow fixed search depth: depth 1–2 at the bottom of the scale.
-  A depth-1 engine plays greedy, short-sighted chess — much closer to a real
-  400-rated player than random moves would be. Far below the floor a small
-  random-move chance (up to 30%) is mixed in; those moves are marked 🎲 in
-  the feed.
+- **Below 1320** — the limiter can't go lower, so the app uses the approach
+  [lichess uses for its weak AI levels](https://lichess.org/forum/general-chess-discussion/how-are-lichess-stockfish-levels-configured):
+  a **normal depth-5 search** paired with a low or negative **Skill Level**.
+  Rather than crippling the search (a depth-1 engine plays alien, not weak),
+  the engine looks at the position properly and then *chooses* among several
+  candidate moves with score noise that grows as the level drops.
+
+  Classical Stockfish only accepts Skill Level 0–20; lichess reaches negative
+  levels by running Fairy-Stockfish. FishTank keeps the stock engine and
+  reimplements Stockfish's own `Skill::pick_best()` formula in JS over a
+  MultiPV list, so the level can go continuously negative down to −20. The
+  Elo → Skill mapping is anchored on lichess's published level calibration
+  (≈400 Elo → skill −9, 500 → −5, 800 → −1, 1100 → +3).
+
+  Only below ~250 Elo is a little pure randomness (max 12%) mixed in; those
+  moves are marked 🎲 in the feed.
+
+  The gold standard for *human-like* weak play is
+  [Maia](https://www.maiachess.com/), a neural net trained on millions of
+  human games at specific rating bands — it reproduces human mistakes rather
+  than approximating them. That needs Leela-style weights per rating, which is
+  heavy for a browser page, so it's out of scope here.
 
 Effective Elo is clamped to **100–3190**, so a bot that keeps draining (a
 long game against TiredFish, say) bottoms out at 100 rather than going

@@ -11,6 +11,78 @@
  *   3. Last resort: Stockfish 10 asm.js from cdnjs (single file, runs anywhere).
  */
 
+/*
+ * Weak-play model.
+ *
+ * Above 1320 Stockfish's own UCI_Elo limiter is calibrated and used directly.
+ * Below it we follow the approach lichess uses for its AI levels 1-5:
+ * a *normal-depth* search (depth 5 — not a crippled depth-1 one) combined with
+ * a low or negative Skill Level, where the engine picks among several
+ * candidate moves after adding score noise that grows as skill drops.
+ *
+ * Classical Stockfish only accepts Skill Level 0-20; lichess gets negative
+ * levels by running Fairy-Stockfish. We keep the stock engine and reproduce
+ * its Skill::pick_best() formula in JS over a MultiPV list, which lets the
+ * level go continuously negative.
+ *
+ * Elo -> Skill Level anchors come from lichess's published level calibration
+ * (level 1 skill -9 ~ <400, level 2 skill -5 ~ 500, level 3 skill -1 ~ 800,
+ * level 4 skill 3 ~ 1100, level 5 skill 7 ~ 1500).
+ */
+const WEAK_DEPTH = 5; // lichess uses depth 5 for its weak AI levels
+
+const SKILL_ANCHORS = [
+  [100, -20],
+  [300, -11],
+  [400, -9],
+  [500, -5],
+  [800, -1],
+  [1100, 3],
+  [1500, 7],
+];
+
+/** Continuous Elo -> Stockfish Skill Level (may be negative). */
+function skillForElo(elo) {
+  if (elo <= SKILL_ANCHORS[0][0]) return SKILL_ANCHORS[0][1];
+  const last = SKILL_ANCHORS[SKILL_ANCHORS.length - 1];
+  if (elo >= last[0]) return last[1];
+  for (let i = 1; i < SKILL_ANCHORS.length; i++) {
+    const [e1, s1] = SKILL_ANCHORS[i - 1];
+    const [e2, s2] = SKILL_ANCHORS[i];
+    if (elo <= e2) return s1 + ((elo - e1) / (e2 - e1)) * (s2 - s1);
+  }
+  return last[1];
+}
+
+/** How many candidate moves to consider. Weaker play needs a wider net. */
+function multipvForSkill(skill) {
+  return skill >= 0 ? 4 : Math.min(12, 4 + Math.round(-skill / 2));
+}
+
+/**
+ * Stockfish's Skill::pick_best() formula, generalised to negative levels.
+ * `ranked` is [{ move, score }] sorted best-first, scores from the mover's
+ * perspective. Weaker levels add a larger deterministic *and* random bonus to
+ * worse moves, so they routinely win the comparison.
+ */
+function pickWithSkillNoise(ranked, skill, rng = Math.random) {
+  if (!ranked || !ranked.length) return null;
+  const weakness = 120 - 2 * skill;
+  const top = ranked[0].score;
+  const delta = Math.min(top - ranked[ranked.length - 1].score, 200);
+  let best = ranked[0];
+  let maxScore = -Infinity;
+  for (const r of ranked) {
+    const push = (weakness * (top - r.score) + delta * (rng() * weakness)) / 128;
+    const adjusted = r.score + push;
+    if (adjusted >= maxScore) {
+      maxScore = adjusted;
+      best = r;
+    }
+  }
+  return best.move;
+}
+
 const ENGINE_SOURCES = [
   {
     name: 'Stockfish 16.1 lite (local)',
@@ -45,6 +117,7 @@ class SillyEngine {
     this.listeners = [];
     this.lastElo = null;
     this.weakDepth = null;
+    this.emulatedSkill = null;
   }
 
   _spawnLocal(src) {
@@ -143,26 +216,39 @@ class SillyEngine {
 
   /**
    * Map an effective Elo to engine settings.
-   *  - 1320..3190: Stockfish's own limiter (UCI_LimitStrength + UCI_Elo).
-   *  - below 1320: the limiter can't go lower, so we approximate club/beginner
-   *    play with Skill Level (adds move randomization) plus a shallow fixed
-   *    search depth — depth 1-2 plays greedy, short-sighted chess like a
-   *    real low-rated player rather than a coin-flipping one.
+   *  - 1320..3190: Stockfish's own calibrated limiter.
+   *  - below 1320:  depth-5 search with a low/negative Skill Level, as lichess
+   *                 does for its weak AI levels. Non-negative skill is handled
+   *                 natively; negative skill is emulated in JS over MultiPV
+   *                 (see pickWithSkillNoise).
    */
   setStrength(effectiveElo) {
     const elo = Math.round(effectiveElo);
     if (elo === this.lastElo) return;
     this.lastElo = elo;
+
     if (elo >= 1320) {
       this.weakDepth = null;
+      this.emulatedSkill = null;
+      this.send('setoption name MultiPV value 1');
       this.send('setoption name Skill Level value 20');
       this.send('setoption name UCI_LimitStrength value true');
       this.send('setoption name UCI_Elo value ' + Math.min(3190, elo));
+      return;
+    }
+
+    const skill = skillForElo(elo);
+    this.weakDepth = WEAK_DEPTH;
+    this.send('setoption name UCI_LimitStrength value false');
+    if (skill >= 0) {
+      // Stock engine can do this itself.
+      this.emulatedSkill = null;
+      this.send('setoption name MultiPV value 1');
+      this.send('setoption name Skill Level value ' + Math.round(skill));
     } else {
-      this.send('setoption name UCI_LimitStrength value false');
-      const skill = Math.max(0, Math.round(((elo - 100) / 1220) * 10)); // ~100->0, 1320->10
-      this.send('setoption name Skill Level value ' + skill);
-      this.weakDepth = elo < 400 ? 1 : elo < 700 ? 2 : elo < 1000 ? 3 : elo < 1200 ? 4 : 5;
+      // Below skill 0: search honestly, then choose badly on purpose.
+      this.emulatedSkill = skill;
+      this.send('setoption name Skill Level value 20');
     }
   }
 
@@ -216,7 +302,13 @@ class SillyEngine {
    */
   async rankMoves(fen, legalCount, depth) {
     if (!legalCount) return null;
-    const multipv = Math.min(250, legalCount);
+    const ranked = await this._rankFrom(fen, Math.min(250, legalCount), depth);
+    this.lastElo = null; // caller's strength settings were disturbed
+    return ranked;
+  }
+
+  /** Shared MultiPV ranking. Leaves MultiPV back at 1. */
+  async _rankFrom(fen, multipv, depth) {
     this.send('setoption name UCI_LimitStrength value false');
     this.send('setoption name Skill Level value 20');
     this.send('setoption name MultiPV value ' + multipv);
@@ -249,9 +341,7 @@ class SillyEngine {
       this.send('go depth ' + depth);
     });
 
-    // Restore: single PV, and force strength reconfiguration for the next move.
     this.send('setoption name MultiPV value 1');
-    this.lastElo = null;
 
     if (!lines.size) return null;
     void result;
@@ -267,7 +357,22 @@ class SillyEngine {
   }
 
   /** Ask for the best move from a FEN. Resolves with a UCI move string like "e2e4" or "e7e8q". */
-  bestMove(fen, movetimeMs) {
+  async bestMove(fen, movetimeMs) {
+    // Emulated negative skill: rank candidates at normal depth, then apply
+    // Stockfish's own skill-noise formula to choose among them.
+    if (this.emulatedSkill !== null && this.emulatedSkill < 0) {
+      const skill = this.emulatedSkill;
+      const ranked = await this._rankFrom(fen, multipvForSkill(skill), WEAK_DEPTH);
+      if (ranked && ranked.length) {
+        const chosen = pickWithSkillNoise(ranked, skill);
+        if (chosen) return chosen;
+      }
+      // Ranking unavailable — fall through to a plain search.
+    }
+    return this._plainBestMove(fen, movetimeMs);
+  }
+
+  _plainBestMove(fen, movetimeMs) {
     return new Promise((resolve) => {
       const handler = (line) => {
         if (line.startsWith('bestmove')) {
@@ -283,5 +388,12 @@ class SillyEngine {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { SillyEngine, ENGINE_SOURCES };
+  module.exports = {
+    SillyEngine,
+    ENGINE_SOURCES,
+    skillForElo,
+    multipvForSkill,
+    pickWithSkillNoise,
+    WEAK_DEPTH,
+  };
 }

@@ -4,10 +4,10 @@
  *
  * Elo model:
  *   - Real Stockfish supports UCI_LimitStrength + UCI_Elo in [1320, 3190].
- *   - We track an unbounded "effective elo". Within range it maps straight to
- *     UCI_Elo. Below 1320 the app switches to Skill Level + shallow fixed
- *     search depth (see engine.js), which plays like a genuinely weak human.
- *     Only far below the floor does a small random-move chance kick in.
+ *   - We track an effective elo in [100, 3190]. Within the engine's range it
+ *     maps straight to UCI_Elo; below 1320 the engine uses a depth-5 search
+ *     with low/negative Skill Level noise (see engine.js), the same approach
+ *     lichess uses for its weak AI levels.
  */
 
 const ELO_MIN = 1320; // Stockfish's own UCI_Elo floor
@@ -20,13 +20,16 @@ function clampElo(elo) {
 }
 
 /**
- * Small residual chance of a totally random move at very low effective Elo.
- * Skill Level + depth limiting (engine.js) do most of the weakening; this
- * only adds occasional chaos below ~700 to mimic true-beginner howlers.
+ * Chance of a completely random (non-engine) move.
+ *
+ * This used to prop up sub-1320 play, but the engine now models weak play
+ * properly via Skill Level noise over a depth-5 MultiPV search (engine.js),
+ * which produces plausible bad moves rather than absurd ones. Only the very
+ * bottom of the scale keeps a small dose of pure chaos.
  */
 function randomMoveProbability(effectiveElo) {
-  if (effectiveElo >= 700) return 0;
-  return Math.min(0.3, ((700 - effectiveElo) / 700) * 0.3);
+  if (effectiveElo >= 250) return 0;
+  return Math.min(0.12, ((250 - effectiveElo) / 250) * 0.12);
 }
 
 function clampUciElo(effectiveElo) {
