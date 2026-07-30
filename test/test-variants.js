@@ -169,6 +169,12 @@ console.log('ThreeCheckFish');
   assert(v.kingLives(s2).b === 2 && v.kingLives(s2).w === 3, 'engine king loses a life');
   v.onEngineMovePlayed(s2, quiet, inCheck); // engine checks the player
   assert(v.kingLives(s2).w === 2, 'player king loses a life');
+
+  const mateOnEngine = { in_checkmate: () => true, turn: () => 'b' }; // black (engine) is mated
+  assert(v.kingLives(s2, mateOnEngine).b === 0, 'checkmated king shows 0 lives');
+  assert(v.kingLives(s2, mateOnEngine).w === 2, 'winner keeps remaining lives');
+  const mateOnPlayer = { in_checkmate: () => true, turn: () => 'w' };
+  assert(v.kingLives(s2, mateOnPlayer).w === 0, 'mated player king shows 0 lives');
 }
 
 console.log('Random-move probability model');

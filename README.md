@@ -25,8 +25,7 @@ installs. The app just adjusts the engine's strength settings between moves.
 
 ## Play it
 
-**Online:** enable GitHub Pages (see below) and play at
-`https://<your-username>.github.io/fishtank/`.
+**Online:** [ldgarratt.github.io/fishtank](https://ldgarratt.github.io/fishtank/)
 
 **Locally:** serve the folder with any static server (workers can't load from
 `file://`):

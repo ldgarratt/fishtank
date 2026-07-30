@@ -267,10 +267,15 @@ const VARIANTS = {
         return { winner: 'engine', msg: '💀 ThreeCheckFish delivered three checks — it wins.' };
       }
     },
-    kingLives(state) {
-      // Lives badge on each king: 3 minus checks received.
-      const playerLives = 3 - (state.engineChecks || 0);
-      const engineLives = 3 - (state.playerChecks || 0);
+    kingLives(state, game) {
+      // Lives badge on each king: 3 minus checks received. A checkmated king
+      // drops straight to 0 regardless of the check count.
+      let playerLives = 3 - (state.engineChecks || 0);
+      let engineLives = 3 - (state.playerChecks || 0);
+      if (game && game.in_checkmate()) {
+        if (game.turn() === state.playerColor) playerLives = 0;
+        else engineLives = 0;
+      }
       return state.playerColor === 'w'
         ? { w: playerLives, b: engineLives }
         : { w: engineLives, b: playerLives };

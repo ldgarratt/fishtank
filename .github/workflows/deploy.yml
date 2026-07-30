@@ -23,6 +23,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Run tests
+        run: node test/test-variants.js
+
       # Vendor Stockfish + chess.js into the deployed site so it is fully
       # self-contained (no CDN needed at runtime).
       - name: Download engine and libraries

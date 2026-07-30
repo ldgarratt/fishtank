@@ -222,7 +222,7 @@
           };
           cell.appendChild(img);
           if (piece.type === 'k' && variant && variant.kingLives) {
-            const lives = variant.kingLives(vstate)[piece.color];
+            const lives = variant.kingLives(vstate, game)[piece.color];
             const badge = document.createElement('span');
             badge.className = 'king-lives' + (lives <= 1 ? ' king-lives-low' : '');
             badge.textContent = lives;
@@ -450,7 +450,7 @@
       logMove(variant.name, san + '  🎲');
     } else {
       engine.setStrength(vstate.elo);
-      const uci = await engine.bestMove(game.fen(), moveTimeFor(clampUciElo(vstate.elo)));
+      const uci = await engine.bestMove(game.fen(), MOVETIME_MS);
       if (!uci || uci === '(none)') {
         thinking = false;
         checkGameEnd();
@@ -492,12 +492,10 @@
     tryPremove();
   }
 
-  function moveTimeFor(uciElo) {
-    // Always give the limiter full thinking time: UCI_Elo's calibration
-    // assumes it, and our single-threaded WASM build is already ~10x slower
-    // than native. Starving it makes nominal ratings play far below par.
-    return 1200;
-  }
+  // Always give the limiter full thinking time: UCI_Elo's calibration assumes
+  // it, and our single-threaded WASM build is already ~10x slower than native.
+  // Starving it makes nominal ratings play far below par.
+  const MOVETIME_MS = 1200;
 
   function checkGameEnd() {
     // Variant-specific win conditions (e.g. three-check) take precedence.
