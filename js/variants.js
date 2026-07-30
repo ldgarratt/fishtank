@@ -24,13 +24,28 @@ function clampUciElo(effectiveElo) {
 
 /*
  * Variant hook contract (all optional):
- *   init(state)                       -> called at game start
- *   onPlayerMove(state, move, game)   -> after the human moves; may return event strings
- *   onEngineTurnStart(state, game)    -> before the engine thinks; may return event strings
- *   extraRandomChance(state, game)    -> additional probability [0,1] of a random move
+ *   init(state)                          -> called at game start
+ *   onPlayerMove(state, move, game)      -> after the human moves; may return event strings
+ *   onEngineTurnStart(state, game)       -> before the engine thinks; may return event strings
+ *   onEngineMovePlayed(state, move, game)-> after the engine's move; may return event strings
+ *   extraRandomChance(state, game)       -> additional probability [0,1] of a random move
  *
- * state = { elo, moveCount, ...variant scratch }
+ * state = { elo, moveCount, playerColor, ...variant scratch }
  */
+
+/** Count the player's pieces standing on the engine's half of the board. */
+function countInvaders(game, playerColor) {
+  let n = 0;
+  for (const f of 'abcdefgh') {
+    for (let r = 1; r <= 8; r++) {
+      const p = game.get(f + r);
+      if (p && p.color === playerColor) {
+        if (playerColor === 'w' ? r >= 5 : r <= 4) n++;
+      }
+    }
+  }
+  return n;
+}
 
 const VARIANTS = {
   panicfish: {
@@ -147,6 +162,69 @@ const VARIANTS = {
       return [`🎰 GamblerFish rolls the dice... it plays this move at ${state.elo} Elo`];
     },
   },
+
+  sharkfish: {
+    id: 'sharkfish',
+    name: 'SharkFish',
+    emoji: '🦈',
+    tagline: 'Gains 150 Elo every time it checks YOUR king.',
+    description:
+      'Starts mid-strength, but it can smell weakness: every check it delivers ' +
+      'makes it stronger. Keep your king safe or get eaten.',
+    baseElo: 1600,
+    demo: [['♗b5+', '1750', '+150'], ['♕h5+', '1900', '+150'], ['♖e8+', '2050', '+150']],
+    onEngineMovePlayed(state, move, game) {
+      if (game.in_check()) {
+        state.elo = Math.min(ELO_MAX, state.elo + 150);
+        return [`🦈 Check! SharkFish smells blood — +150 Elo → ${state.elo}`];
+      }
+    },
+  },
+
+  pacifistfish: {
+    id: 'pacifistfish',
+    name: 'PacifistFish',
+    emoji: '🕊️',
+    tagline: 'Loses 300 Elo every time IT captures one of your pieces.',
+    description:
+      'Full strength, but it hates itself for violence. Every piece it takes ' +
+      'from you costs it dearly. Bait it into trades — sacrifice for victory.',
+    baseElo: ELO_MAX,
+    demo: [['♗xf6', '2890', '−300'], ['♘xd5', '2590', '−300'], ['♕xh7', '2290', '−300']],
+    onEngineMovePlayed(state, move) {
+      if (move && move.captured) {
+        state.elo -= 300;
+        return [
+          `🕊️ It captured your ${pieceName(move.captured)} and hates itself — −300 Elo → ${state.elo}`,
+        ];
+      }
+    },
+  },
+
+  cowardfish: {
+    id: 'cowardfish',
+    name: 'CowardFish',
+    emoji: '🙈',
+    tagline: 'Loses 100 Elo for each of your pieces on its half of the board.',
+    description:
+      'Full strength while you stay home. Every piece you park on its side of ' +
+      'the board terrifies it. March forward and watch it faint.',
+    baseElo: ELO_MAX,
+    demo: [['♙e5', '3090', '−100'], ['♘f5', '2990', '−100'], ['♕h5', '2890', '−100']],
+    onEngineTurnStart(state, game) {
+      const invaders = countInvaders(game, state.playerColor);
+      state.elo = this.baseElo - 100 * invaders;
+      if (invaders !== (state.lastInvaders || 0)) {
+        state.lastInvaders = invaders;
+        if (invaders > 0) {
+          return [
+            `🙈 ${invaders} invader${invaders === 1 ? '' : 's'} on its half — CowardFish trembles! Elo → ${state.elo}`,
+          ];
+        }
+        return [`🙈 Its half is clear again. CowardFish recovers → ${state.elo}`];
+      }
+    },
+  },
 };
 
 function pieceName(p) {
@@ -157,5 +235,5 @@ function pieceName(p) {
 
 // Export for node-based tests.
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { VARIANTS, randomMoveProbability, clampUciElo, ELO_MIN, ELO_MAX };
+  module.exports = { VARIANTS, randomMoveProbability, clampUciElo, countInvaders, ELO_MIN, ELO_MAX };
 }

@@ -18,6 +18,9 @@ live, mid-game.
 | **DrunkFish** | 🍺 | Full strength, but a **growing chance each move of playing a completely random move**. |
 | **RageFish** | 😡 | Starts at **200 Elo**, playing near-random moves. **Gains 200 Elo every time you capture a piece**. Don't take the bait. |
 | **GamblerFish** | 🎰 | Its Elo **secretly re-rolls every move** — beginner to superhuman. Good luck. |
+| **SharkFish** | 🦈 | Starts at 1600. **Gains 150 Elo every time it checks YOUR king.** Keep your king safe. |
+| **PacifistFish** | 🕊️ | **Loses 300 Elo every time IT captures one of your pieces.** Bait it into trades. |
+| **CowardFish** | 🙈 | **Loses 100 Elo for each of your pieces on its half of the board.** March forward. |
 
 ## Play it
 
@@ -89,8 +92,10 @@ bloodfish: {
 ```
 
 Hooks you can use: `onPlayerMove(state, move, game)` (after the human moves),
-`onEngineTurnStart(state, game)` (before the engine thinks), and
+`onEngineTurnStart(state, game)` (before the engine thinks),
+`onEngineMovePlayed(state, move, game)` (after the engine's move), and
 `extraRandomChance(state, game)` (probability of a totally random move).
+`state.playerColor` tells you which side the human plays.
 `state.elo` is the effective Elo; below 1320 the app automatically converts
 the deficit into random-move probability.
 

@@ -105,6 +105,45 @@ console.log('GamblerFish');
   }
 }
 
+console.log('SharkFish');
+{
+  const v = VARIANTS.sharkfish;
+  const s = { elo: v.baseElo, moveCount: 0 };
+  assert(v.baseElo === 1600, 'starts at 1600');
+  v.onEngineMovePlayed(s, quiet, inCheck);
+  assert(s.elo === 1750, 'its check gains +150');
+  v.onEngineMovePlayed(s, quiet, notInCheck);
+  assert(s.elo === 1750, 'quiet move gains nothing');
+  for (let i = 0; i < 20; i++) v.onEngineMovePlayed(s, quiet, inCheck);
+  assert(s.elo === 3190, 'caps at 3190');
+}
+
+console.log('PacifistFish');
+{
+  const v = VARIANTS.pacifistfish;
+  const s = { elo: v.baseElo, moveCount: 0 };
+  v.onEngineMovePlayed(s, capture, notInCheck);
+  assert(s.elo === 3190 - 300, 'its capture costs 300');
+  v.onEngineMovePlayed(s, quiet, notInCheck);
+  assert(s.elo === 3190 - 300, 'quiet move costs nothing');
+}
+
+console.log('CowardFish');
+{
+  const v = VARIANTS.cowardfish;
+  const s = { elo: v.baseElo, moveCount: 0, playerColor: 'w' };
+  const board = { e5: { color: 'w', type: 'p' }, f6: { color: 'w', type: 'n' }, e4: { color: 'w', type: 'p' }, d8: { color: 'b', type: 'q' } };
+  const fakeGame = { get: (sq) => board[sq] || null };
+  const evs = v.onEngineTurnStart(s, fakeGame);
+  assert(s.elo === 3190 - 200, 'two invaders (e5, f6) -> −200; own-half piece (e4) free');
+  assert(evs && evs.length === 1, 'announces the invasion');
+  const evs2 = v.onEngineTurnStart(s, fakeGame);
+  assert(evs2 === undefined, 'no repeat announcement while count unchanged');
+  delete board.e5; delete board.f6;
+  v.onEngineTurnStart(s, fakeGame);
+  assert(s.elo === 3190, 'recovers when its half clears');
+}
+
 console.log('Random-move probability model');
 {
   assert(randomMoveProbability(ELO_MIN) === 0, 'no random moves at engine floor');

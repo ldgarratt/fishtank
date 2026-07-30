@@ -91,13 +91,13 @@
       history.pushState(null, '', '#' + variantId);
     }
     els.btnRematch.classList.add('hidden');
-    vstate = { elo: variant.baseElo, moveCount: 0 };
+    playerColor = els.sideSelect.value === 'b' ? 'b' : 'w';
+    vstate = { elo: variant.baseElo, moveCount: 0, playerColor };
     if (variant.init) variant.init(vstate);
     game = new Chess();
     selectedSquare = null;
     thinking = false;
     gameOver = false;
-    playerColor = els.sideSelect.value === 'b' ? 'b' : 'w';
 
     els.picker.classList.add('hidden');
     els.game.classList.remove('hidden');
@@ -241,12 +241,14 @@
     let san = null;
 
     let engineCaptured = false;
+    let engMove = null;
     if (Math.random() < pRandom) {
       const moves = game.moves({ verbose: true });
       const m = moves[Math.floor(Math.random() * moves.length)];
       await sleep(350 + Math.random() * 500);
       const played = game.move(m.san);
       san = played.san;
+      engMove = played;
       engineCaptured = !!played.captured;
       logMove(variant.name, san + '  🎲');
     } else {
@@ -269,14 +271,20 @@
         const m = moves[Math.floor(Math.random() * moves.length)];
         const p2 = game.move(m.san);
         san = m.san;
+        engMove = p2;
         engineCaptured = !!(p2 && p2.captured);
       } else {
         san = played.san;
+        engMove = played;
         engineCaptured = !!played.captured;
       }
       logMove(variant.name, san);
     }
     sound.play(game.in_check() ? 'check' : engineCaptured ? 'capture' : 'move');
+
+    const engEvents =
+      (variant.onEngineMovePlayed && variant.onEngineMovePlayed(vstate, engMove, game)) || [];
+    for (const ev of engEvents) logEvent(ev);
 
     vstate.moveCount += 1;
     thinking = false;
