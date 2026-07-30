@@ -98,8 +98,8 @@ the deficit into random-move probability.
 
 - [Stockfish](https://stockfishchess.org/) 16.1 "lite" single-threaded WASM
   build from the official [stockfish npm package](https://www.npmjs.com/package/stockfish) (GPLv3)
-- [chess.js](https://github.com/jhlywa/chess.js) 0.13.4 for rules, legality,
-  check/mate detection (BSD-2)
+- [chess.js](https://github.com/jhlywa/chess.js) 0.10.3 (classic-script build)
+  for rules, legality, check/mate detection (BSD-2)
 - Vanilla JS/CSS GUI — no framework, no build step
 
 Run the variant-logic unit tests with:

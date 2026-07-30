@@ -18,10 +18,16 @@ grep -q "Stockfish" stockfish-16.1-lite-single.js
 [ "$(head -c 4 stockfish-16.1-lite-single.wasm)" = "$(printf '\0asm')" ]
 
 # Also vendor chess.js so local play works fully offline.
+# NOTE: must be the classic-script (global `Chess`) build — the file at the
+# GitHub v0.13.x tags is an ES module and breaks as a plain <script>.
 mkdir -p ../vendor
 curl -fsSL -o ../vendor/chess.js \
-  https://raw.githubusercontent.com/jhlywa/chess.js/v0.13.4/chess.js
+  https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.js
 grep -q "in_checkmate" ../vendor/chess.js
+if grep -qE '^\s*export ' ../vendor/chess.js; then
+  echo "ERROR: chess.js is an ES module build; need classic script" >&2
+  exit 1
+fi
 
 echo "Done. Files downloaded:"
 ls -lh stockfish-16.1-lite-single.* ../vendor/chess.js
