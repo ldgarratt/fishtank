@@ -19,7 +19,14 @@ let ffish = null;
 let board = null;
 let pushCount = 0;
 
-const VALS = { p: 100, n: 300, b: 320, r: 500, q: 900, a: 1150, k: 0 };
+/*
+ * Piece values in centipawns. 'a' is the amazon (queen + knight) in the dragon
+ * variants but the archbishop (bishop + knight) in ArmyFish, so a variant can
+ * override these — without it the search would value an archbishop like an
+ * amazon, or score an unknown piece such as the chancellor at nothing at all.
+ */
+const BASE_VALS = { p: 100, n: 300, b: 320, r: 500, q: 900, a: 1150, k: 0 };
+let VALS = Object.assign({}, BASE_VALS);
 const THINK_MS = 1300;
 
 function post(msg) {
@@ -51,14 +58,50 @@ function loadFfish(base, onFail) {
   }
 }
 
+/*
+ * Which fairy variant this worker is playing. DragonFish uses the built-in
+ * "amazon" variant; the handicap variants are defined at runtime through
+ * ffish.loadVariantConfig, so they need no engine rebuild.
+ */
+let variantName = 'amazon';
+let variantConfig = null;
+let pendingSpec = null; // arrives before ffish finishes loading
+
+function applySpec(spec) {
+  variantName = spec.variantName || 'amazon';
+  variantConfig = spec.config || null;
+  VALS = Object.assign({}, BASE_VALS, spec.values || {});
+}
+
+function newBoard() {
+  if (variantConfig) {
+    ffish.loadVariantConfig(variantConfig);
+    const known = ffish.variants().split(/\s+/);
+    if (known.indexOf(variantName) === -1) {
+      throw new Error(
+        `variant "${variantName}" was not registered; ffish knows: ` +
+          known.slice(0, 12).join(', ') + '…'
+      );
+    }
+  }
+  return new ffish.Board(variantName);
+}
+
 function onReady() {
   try {
-    board = new ffish.Board('amazon');
+    if (pendingSpec) {
+      applySpec(pendingSpec);
+      pendingSpec = null;
+    }
+    board = newBoard();
     pushCount = 0;
-    post({ type: 'ready' });
+    post({ type: 'ready', variant: variantName });
     post(stateMsg({}));
   } catch (e) {
-    post({ type: 'fatal', error: 'ffish loaded but amazon board failed: ' + String(e) });
+    post({
+      type: 'fatal',
+      error: `ffish loaded but the "${variantName}" board failed: ` + String(e),
+    });
   }
 }
 
@@ -238,7 +281,9 @@ function scan() {
       const val = VALS[lower];
       if (val !== undefined) {
         const white = ch !== lower;
-        const table = PST[lower];
+        // Unknown fairy pieces (e.g. the chancellor) borrow the queen's table:
+        // "get it off the back rank and near the middle" holds for all of them.
+        const table = PST[lower] || PST.q;
         // Black reads the same table from the opposite end of the board.
         const pos = table ? table[(white ? row : 7 - row) * 8 + file] : 0;
         score += white ? val + pos : -(val + pos);
@@ -412,10 +457,25 @@ function think() {
 self.onmessage = (e) => {
   const msg = e.data || {};
   try {
+    // The spec can arrive before ffish has finished loading, in which case it
+    // is held until onReady runs.
+    if (msg.type === 'configure') {
+      if (!ffish) {
+        pendingSpec = msg;
+        return;
+      }
+      applySpec(msg);
+      if (board) board.delete();
+      board = newBoard();
+      pushCount = 0;
+      post({ type: 'ready', variant: variantName });
+      post(stateMsg({}));
+      return;
+    }
     if (!board) return;
     if (msg.type === 'new') {
       board.delete();
-      board = new ffish.Board('amazon');
+      board = newBoard();
       pushCount = 0;
       post(stateMsg({}));
     } else if (msg.type === 'push') {

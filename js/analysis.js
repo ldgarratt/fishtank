@@ -103,13 +103,15 @@ const Analysis = (() => {
    * @param engine   SillyEngine instance (will be set to full strength)
    * @param pgnMoves verbose move list from chess.js (game.history({verbose:true}))
    * @param onProgress (done, total) => void
+   * @param startFen   position the game began from, for variants that do not
+   *                   start from the standard array (e.g. OddsFish)
    * @returns { moves: [...], summary: { w: {...}, b: {...} }, graph: [cp...] }
    */
-  async function run(engine, pgnMoves, onProgress) {
+  async function run(engine, pgnMoves, onProgress, startFen) {
     engine.setFullStrength();
 
     // Collect the FEN before every move, plus the final position.
-    const walker = new Chess();
+    const walker = startFen ? new Chess(startFen) : new Chess();
     const fens = [walker.fen()];
     for (const m of pgnMoves) {
       walker.move(m.san);

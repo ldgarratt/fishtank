@@ -725,6 +725,97 @@ async function testDrawFish() {
   }
 }
 
+console.log('Handicap variants');
+{
+  const fs = require('fs');
+  const vendored = path.join(__dirname, '..', 'vendor', 'chess.js');
+
+  // OddsFish is standard chess from a lopsided position, so chess.js has to
+  // accept the FEN and the *engine* must be the side missing a queen.
+  const odds = VARIANTS.oddsfish;
+  assert(typeof odds.startFen === 'function', 'OddsFish defines a starting position');
+  assert(!odds.fairy, 'OddsFish needs no fairy engine — it is ordinary chess');
+  if (!fs.existsSync(vendored)) {
+    console.log('  skip - chess.js not vendored (run engine/get-engine.sh)');
+  } else {
+    const mod = require(vendored);
+    const ChessCtor = mod.Chess || mod;
+    for (const playerColor of ['w', 'b']) {
+      const fen = odds.startFen(playerColor);
+      const g = new ChessCtor(fen);
+      assert(g.fen() === fen, `OddsFish (${playerColor}) FEN is valid and loads intact`);
+      assert(fen.split(' ')[1] === 'w', 'White still moves first whichever side you take');
+      const placement = fen.split(' ')[0];
+      const mine = playerColor === 'w' ? /Q/g : /q/g;
+      const theirs = playerColor === 'w' ? /q/g : /Q/g;
+      assert((placement.match(mine) || []).length === 1, 'you keep your queen');
+      assert((placement.match(theirs) || []).length === 0, 'the engine has none');
+      // Both kings present, or it is not a chess position at all.
+      assert(/K/.test(placement) && /k/.test(placement), 'both kings are on the board');
+    }
+  }
+
+  // The fairy handicaps are defined at runtime, so the config text has to be
+  // well formed and the advantage has to follow the player's colour.
+  for (const id of ['handicapfish', 'armyfish']) {
+    const v = VARIANTS[id];
+    const spec = v.fairySpec;
+    assert(v.fairy === true, `${v.name} is flagged as a fairy variant`);
+    assert(spec && typeof spec.config === 'function', `${v.name} builds a variant config`);
+
+    for (const playerColor of ['w', 'b']) {
+      const cfg = spec.config(playerColor);
+      assert(cfg.startsWith(`[${spec.variantName}:chess]`),
+        `${v.name} (${playerColor}) inherits from chess`);
+      const fen = (cfg.match(/startFen = (.+)/) || [])[1];
+      assert(!!fen, `${v.name} (${playerColor}) sets a start FEN`);
+
+      const ranks = fen.split(' ')[0].split('/');
+      assert(ranks.length === 8, `${v.name} (${playerColor}) FEN has 8 ranks`);
+      for (const rank of ranks) {
+        const width = [...rank].reduce(
+          (n, c) => n + (c >= '1' && c <= '9' ? +c : 1), 0
+        );
+        if (width !== 8) {
+          assert(false, `${v.name} (${playerColor}) rank "${rank}" is ${width} wide`);
+        }
+      }
+      assert(true, `${v.name} (${playerColor}) every rank is 8 squares wide`);
+
+      // Upgraded pieces must be on the human's back rank, never the engine's.
+      const upgraded = Object.keys(spec.glyphs);
+      const myRank = playerColor === 'w' ? ranks[7] : ranks[0];
+      const theirRank = playerColor === 'w' ? ranks[0] : ranks[7];
+      const has = (rank, set, upper) =>
+        set.some((p) => rank.includes(upper ? p.toUpperCase() : p));
+      assert(has(myRank, upgraded, playerColor === 'w'),
+        `${v.name} (${playerColor}) puts the strong pieces on your side`);
+      assert(!has(theirRank, upgraded, playerColor !== 'w'),
+        `${v.name} (${playerColor}) leaves the engine an ordinary army`);
+
+      // Kings on e-file with rooks in the corners, so castling still works.
+      assert(myRank[4].toLowerCase() === 'k' && theirRank[4].toLowerCase() === 'k',
+        `${v.name} (${playerColor}) keeps both kings on the e-file`);
+      assert(myRank[0].toLowerCase() === 'r' && myRank[7].toLowerCase() === 'r',
+        `${v.name} (${playerColor}) keeps rooks in the corners for castling`);
+    }
+
+    // Every fairy piece needs a value, or the search treats it as worthless.
+    for (const letter of Object.keys(spec.glyphs)) {
+      assert(spec.values && typeof spec.values[letter] === 'number',
+        `${v.name} prices its "${letter}" piece for the search`);
+    }
+    assert(cfgDefinesPieces(spec), `${v.name} declares each fairy piece it uses`);
+  }
+
+  function cfgDefinesPieces(spec) {
+    const cfg = spec.config('w');
+    return Object.keys(spec.glyphs).every((letter) =>
+      new RegExp(`= ${letter}\\s*$`, 'm').test(cfg)
+    );
+  }
+}
+
 console.log('Variant ordering');
 {
   const fs = require('fs');

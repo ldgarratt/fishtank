@@ -32,6 +32,8 @@ const FairyEngine = (() => {
     });
   }
 
+  let uciVariant = 'amazon';
+
   async function doInit() {
     if (!self.crossOriginIsolated) return false;
     const loaded = await new Promise((resolve) => {
@@ -50,7 +52,7 @@ const FairyEngine = (() => {
       });
       sf.postMessage('uci');
       await expect((l) => l.includes('uciok'), 15000);
-      sf.postMessage('setoption name UCI_Variant value amazon');
+      sf.postMessage('setoption name UCI_Variant value ' + uciVariant);
       sf.postMessage('isready');
       await expect((l) => l.includes('readyok'), 10000);
       return true;
@@ -62,8 +64,16 @@ const FairyEngine = (() => {
   }
 
   return {
-    /** Resolves true if the full engine is usable. Safe to call repeatedly. */
-    ready() {
+    /**
+     * Resolves true if the full engine is usable for `variant`. Safe to call
+     * repeatedly. Only the variants compiled into the prebuilt binary work
+     * here — runtime-defined ones have to use the built-in search instead.
+     */
+    ready(variant) {
+      if (variant && variant !== uciVariant) {
+        if (initPromise) return Promise.resolve(false); // already set up elsewhere
+        uciVariant = variant;
+      }
       if (!initPromise) initPromise = doInit();
       return initPromise;
     },

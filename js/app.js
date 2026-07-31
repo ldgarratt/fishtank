@@ -117,7 +117,8 @@
           playSound: (n) => sound.play(n),
           onGameEnd: () => els.btnRematch.classList.remove('hidden'),
         },
-        playerColor
+        playerColor,
+        Object.assign({ name: variant.name }, variant.fairySpec)
       );
       return;
     }
@@ -125,7 +126,10 @@
     playerColor = els.sideSelect.value === 'b' ? 'b' : 'w';
     vstate = { elo: variant.baseElo, moveCount: 0, playerColor };
     if (variant.init) variant.init(vstate);
-    game = new Chess();
+    // A variant may start from a lopsided position (OddsFish plays the engine
+    // a queen down). The handicap follows the player's colour, so the FEN is
+    // built once the side is known.
+    game = variant.startFen ? new Chess(variant.startFen(playerColor)) : new Chess();
     selectedSquare = null;
     thinking = false;
     gameOver = false;
@@ -843,6 +847,11 @@
       'Result', result,
       'Variant', variant.name
     );
+    // Without SetUp/FEN a lopsided game replays from the wrong position in
+    // every other viewer.
+    if (variant.startFen) {
+      game.header('SetUp', '1', 'FEN', variant.startFen(playerColor));
+    }
     return game.pgn({ max_width: 80, newline_char: '\n' });
   }
 
@@ -880,9 +889,14 @@
     const bar = els.analysis.querySelector('.an-bar');
 
     try {
-      const report = await Analysis.run(engine, history, (done, total) => {
-        bar.style.width = Math.round((done / total) * 100) + '%';
-      });
+      const report = await Analysis.run(
+        engine,
+        history,
+        (done, total) => {
+          bar.style.width = Math.round((done / total) * 100) + '%';
+        },
+        variant.startFen ? variant.startFen(playerColor) : null
+      );
       analysisReport = report;
       renderAnalysis(report);
       // Drop into review at the first real mistake, or the start of the game
@@ -997,8 +1011,17 @@
 
   /* ---------- move navigation (arrow keys, lichess style) ---------- */
 
+  /** The chess.js instance a variant's game starts from (may be lopsided). */
+  function freshGame() {
+    return variant && variant.startFen
+      ? new Chess(variant.startFen(playerColor))
+      : new Chess();
+  }
+
   function positionAt(ply) {
-    const replay = new Chess();
+    // Must replay from the variant's own starting position, not the standard
+    // one, or every reviewed position is wrong for OddsFish.
+    const replay = freshGame();
     const history = game.history();
     for (let i = 0; i < ply; i++) replay.move(history[i]);
     return replay;

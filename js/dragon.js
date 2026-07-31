@@ -1,7 +1,11 @@
 /*
- * DragonFish main-thread controller (beta) — renders the amazon-variant board
- * from FEN, handles clicks against the worker-provided legal move list, and
- * relays sounds/feed events. Completely independent of the chess.js game flow.
+ * Fairy-variant controller (beta) — renders a Fairy-Stockfish board from FEN,
+ * handles clicks against the worker-provided legal move list, and relays
+ * sounds/feed events. Completely independent of the chess.js game flow.
+ *
+ * Drives every non-standard variant: DragonFish (built-in "amazon"), and the
+ * handicap variants, which are defined at runtime via ffish.loadVariantConfig
+ * and so need no engine rebuild.
  */
 /* global sound, FairyEngine */
 
@@ -17,27 +21,29 @@ const DragonMode = (() => {
   let thinking = false;
   let gameOver = false;
   let brainAnnounced = false;
+  let spec = null; // { variantName, config, glyphs, values, fullEngine }
+  let botName = 'DragonFish';
 
   const DRAGON_CDN_PIECES =
     'https://raw.githubusercontent.com/lichess-org/lila/master/public/piece/cburnett/';
 
   function ensureWorker() {
     if (worker) return;
-    worker = new Worker('js/dragon-worker.js?v=12');
+    worker = new Worker('js/dragon-worker.js?v=47');
     worker.onmessage = (e) => handleMsg(e.data);
     worker.onerror = (e) => {
-      hooks.setStatus('🐉 DragonFish failed to load: ' + (e.message || 'worker error'));
+      hooks.setStatus(`${botName} failed to load: ` + (e.message || 'worker error'));
     };
   }
 
   function handleMsg(msg) {
     if (!active) return;
     if (msg.type === 'fatal') {
-      hooks.setStatus('🐉 DragonFish could not start (beta): ' + msg.error);
+      hooks.setStatus(`${botName} could not start (beta): ` + msg.error);
       return;
     }
     if (msg.type === 'ready') {
-      hooks.logEvent('🐉 Fairy-Stockfish rules loaded (amazon variant).');
+      hooks.logEvent(`🐉 Fairy-Stockfish rules loaded (${msg.variant} variant).`);
       return;
     }
     if (msg.type !== 'state') return;
@@ -52,7 +58,7 @@ const DragonMode = (() => {
     if (msg.engineMove) {
       thinking = false;
       lastMove = msg.engineMove.uci;
-      hooks.logMove('DragonFish', msg.engineMove.san);
+      hooks.logMove(botName, msg.engineMove.san);
       hooks.playSound(msg.engineMove.captured ? 'capture' : 'move');
       if (msg.inCheck) hooks.playSound('check');
     }
@@ -63,8 +69,8 @@ const DragonMode = (() => {
       gameOver = true;
       let text;
       if (msg.result === 'draw') text = '🤝 Draw.';
-      else if (msg.result === playerColor) text = '🏆 Checkmate — you slayed the DragonFish!';
-      else text = '💀 Checkmate — DragonFish wins.';
+      else if (msg.result === playerColor) text = `🏆 Checkmate — you beat ${botName}!`;
+      else text = `💀 Checkmate — ${botName} wins.`;
       hooks.setStatus(text);
       hooks.logEvent(text);
       hooks.playSound(msg.result === 'draw' ? 'draw' : msg.result === playerColor ? 'victory' : 'defeat');
@@ -74,7 +80,7 @@ const DragonMode = (() => {
 
     if (msg.turn !== playerColor && !thinking) {
       thinking = true;
-      hooks.setStatus('🐉 DragonFish is thinking…');
+      hooks.setStatus(`${botName} is thinking…`);
       engineTurn(msg);
     } else if (msg.turn === playerColor) {
       hooks.setStatus('Your move.');
@@ -84,7 +90,9 @@ const DragonMode = (() => {
   async function engineTurn(snapshot) {
     let usedFull = false;
     try {
-      if (await FairyEngine.ready()) {
+      // Runtime-defined variants are unknown to the prebuilt NNUE engine, so
+      // those go straight to the built-in search.
+      if (spec && spec.fullEngine !== false && await FairyEngine.ready(spec.variantName)) {
         const uci = await FairyEngine.bestMove(snapshot.fen, 1400);
         if (uci && snapshot.moves.indexOf(uci) !== -1) {
           usedFull = true;
@@ -106,8 +114,8 @@ const DragonMode = (() => {
     brainAnnounced = true;
     hooks.logEvent(
       full
-        ? '🐉 Full Fairy-Stockfish engine active.'
-        : '🐉 Using built-in lite search (full engine unavailable in this browser).'
+        ? '⚙️ Full Fairy-Stockfish engine active.'
+        : '⚙️ Using the built-in search (the full engine does not know this variant).'
     );
   }
 
@@ -132,10 +140,13 @@ const DragonMode = (() => {
   function pieceEl(ch) {
     const isWhite = ch === ch.toUpperCase();
     const lower = ch.toLowerCase();
-    if (lower === 'a') {
+    // Fairy pieces have no cburnett SVG, so they are drawn as an emoji chosen
+    // by the variant (a dragon, a chancellor's tower, an archbishop's eagle).
+    const glyph = (spec && spec.glyphs && spec.glyphs[lower]) || null;
+    if (glyph) {
       const span = document.createElement('span');
       span.className = 'dragon-piece ' + (isWhite ? 'dragon-white' : 'dragon-black');
-      span.textContent = '🐉';
+      span.textContent = glyph;
       return span;
     }
     const img = document.createElement('img');
@@ -335,7 +346,12 @@ const DragonMode = (() => {
 
   return {
     isActive: () => active,
-    start(elements, callbacks, color) {
+    /**
+     * @param variantSpec { variantName, config(playerColor), glyphs, values,
+     *                      fullEngine, name } — describes the fairy variant to
+     *                      play. Defaults to DragonFish's amazon chess.
+     */
+    start(elements, callbacks, color, variantSpec) {
       els = elements;
       hooks = callbacks;
       playerColor = color;
@@ -344,14 +360,23 @@ const DragonMode = (() => {
       lastMove = null;
       thinking = false;
       gameOver = false;
+      brainAnnounced = false;
+      spec = variantSpec || { variantName: 'amazon', glyphs: { a: '🐉' } };
+      botName = spec.name || 'DragonFish';
       ensureWorker();
-      FairyEngine.ready(); // warm up the full engine in the background
-      FairyEngine.newGame();
-      hooks.setStatus('🐉 Loading Fairy-Stockfish rules…');
-      if (state) {
-        worker.postMessage({ type: 'new' });
+      if (spec.fullEngine !== false) {
+        FairyEngine.ready(spec.variantName); // warm up in the background
+        FairyEngine.newGame();
       }
-      // If the worker is still booting, its first state message starts the game.
+      hooks.setStatus('Loading Fairy-Stockfish rules…');
+      // The config is a function of the player's colour: the handicap always
+      // has to land on the human's side of the board.
+      worker.postMessage({
+        type: 'configure',
+        variantName: spec.variantName,
+        config: typeof spec.config === 'function' ? spec.config(color) : spec.config,
+        values: spec.values,
+      });
     },
     stop() {
       active = false;
@@ -368,7 +393,7 @@ const DragonMode = (() => {
     resign() {
       if (!active || gameOver) return;
       gameOver = true;
-      const msg = '🏳️ You resigned. DragonFish wins.';
+      const msg = `🏳️ You resigned. ${botName} wins.`;
       hooks.playSound('defeat');
       hooks.setStatus(msg);
       hooks.logEvent(msg);

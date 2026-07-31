@@ -23,6 +23,9 @@ installs. The app just adjusts the engine's strength settings between moves.
 | **WorstFish** | Plays the **worst legal move** in every position. Hangs everything, walks into mate. |
 | **PityFish** | Starts at 3190. **Loses 500 Elo whenever your move is the single worst legal move** in the position. |
 | **CowardFish** | **Loses 400 Elo for each of your pieces on its half of the board.** March forward. |
+| **OddsFish** | Full strength, but **starts the game without its queen**. The classical handicap. |
+| **HandicapFish** | **Your queen is a dragon** (queen + knight); its queen is an ordinary queen. |
+| **ArmyFish** | **Your knights are chancellors and your bishops are archbishops**; the engine gets a normal army. |
 | **ThreeCheckFish** | Fixed 2200 Elo, but **three-check rules: first side to give three checks wins.** It doesn't know the rule. |
 | **DragonFish** | **Amazon chess** (beta): the queen is replaced by a dragon, which moves like a queen *and* a knight. Pawns promote to a dragon, rook, bishop or knight. Rules by Fairy-Stockfish. |
 
@@ -144,6 +147,32 @@ allowance evenly.
 Maia (above) covers 1100–1900. Outside that band this model is what runs, and
 it is also what DrawFish, WorstFish, PityFish and the post-game analysis use,
 since those need evaluations and Maia returns only a move distribution.
+
+## Handicap variants
+
+Three bots hand *you* the advantage instead of weakening the engine:
+
+- **OddsFish** is ordinary chess from a lopsided position — the engine simply
+  starts without its queen. No fairy engine involved; it is a custom start FEN
+  fed to chess.js and Stockfish, and the PGN carries `SetUp`/`FEN` so the game
+  replays correctly elsewhere.
+- **HandicapFish** and **ArmyFish** need pieces that standard chess does not
+  have, so they are defined at runtime with `ffish.loadVariantConfig`:
+
+  ```ini
+  [army:chess]
+  archbishop = a
+  chancellor = c
+  startFen = rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RCAQKACR w KQkq - 0 1
+  ```
+
+  Inheriting from `chess` means only the differences need stating. The starting
+  FEN is generated per game, because the upgraded pieces must always land on
+  whichever colour *you* chose.
+
+The prebuilt Fairy-Stockfish NNUE binary only knows the variants compiled into
+it, so these two always use the built-in search described below. Since you are
+several points of material up, that is not much of a loss.
 
 ## DragonFish and fairy variants (beta)
 
