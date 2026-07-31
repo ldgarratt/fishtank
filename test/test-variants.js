@@ -420,6 +420,53 @@ console.log('Analysis scoring');
     Analysis.moveAccuracy(50, 45) > Analysis.moveAccuracy(50, 30),
     'smaller drops score higher'
   );
+
+  // Game accuracy: the harmonic half must stop blunders from being averaged
+  // away. A plain mean of this game is ~80%, which is the bug we fixed.
+  const flat = (n, v) => Array(n).fill(v);
+  const ones = (n) => flat(n, 1);
+  const messy = [...flat(25, 95), ...flat(5, 3)];
+  const plainMean = messy.reduce((a, b) => a + b, 0) / messy.length;
+  const scored = Analysis.aggregate(messy, ones(messy.length));
+  assert(plainMean > 75, 'sanity: the plain mean really is that forgiving');
+  assert(scored < 60, 'five disasters in 30 moves is not a decent game (' +
+    scored.toFixed(1) + '%)');
+
+  assert(
+    Math.abs(Analysis.aggregate(flat(30, 100), ones(30)) - 100) < 0.01,
+    'a flawless game is still 100%'
+  );
+  assert(
+    Math.abs(Analysis.aggregate(flat(30, 95), ones(30)) - 95) < 0.01,
+    'uniform accuracy is unchanged by the weighting'
+  );
+  const oneBlunder = Analysis.aggregate([...flat(29, 97), 5], ones(30));
+  assert(oneBlunder > 65 && oneBlunder < 85,
+    'a single blunder costs real points but is not fatal (' +
+    oneBlunder.toFixed(1) + '%)');
+  assert(
+    Analysis.aggregate(flat(20, 60), ones(20)) <
+      Analysis.aggregate(flat(20, 80), ones(20)),
+    'worse games score lower'
+  );
+  assert(Analysis.aggregate([], []) === 100, 'an empty game does not divide by zero');
+  assert(Analysis.aggregate([0, 0, 0], ones(3)) >= 0, 'all-zero accuracy stays finite');
+
+  // Weights: volatile stretches should matter more than dead-quiet ones.
+  const quiet = Analysis.volatilityWeights(flat(40, 50));
+  assert(quiet.every((w) => w === 0.5), 'a flat game floors every weight at 0.5');
+  const swingy = Analysis.volatilityWeights(
+    Array.from({ length: 40 }, (_, i) => (i % 2 ? 90 : 10))
+  );
+  assert(swingy.every((w) => w > quiet[0]), 'a swinging game weighs more heavily');
+  assert(swingy.every((w) => w <= 12), 'weights are capped at 12');
+  assert(
+    Analysis.volatilityWeights(flat(40, 50)).length === 39,
+    'one weight per move, not per position'
+  );
+  assert(Math.abs(Analysis.stdDev([2, 4, 4, 4, 5, 5, 7, 9]) - 2) < 1e-9,
+    'stdDev matches the textbook value');
+  assert(Analysis.stdDev([7]) === 0, 'a single sample has no spread');
 }
 
 async function testDrawFish() {
@@ -470,33 +517,6 @@ async function testDrawFish() {
     res = await v.pickMove(s, { engine: engineWith(null), fen: 'x', legalCount: 5 });
     assert(res === null, 'falls through gracefully when ranking is unavailable');
   }
-}
-
-console.log('Analysis scoring');
-{
-  const { Analysis } = require(path.join(__dirname, '..', 'js', 'analysis.js'));
-  assert(Math.abs(Analysis.winPercent(0) - 50) < 1e-6, 'even position = 50% win chance');
-  assert(Analysis.winPercent(300) > 70, '+3 pawns is a large advantage (' +
-    Analysis.winPercent(300).toFixed(1) + '%)');
-  assert(Analysis.winPercent(-300) < 30, '-3 pawns is losing');
-  assert(
-    Math.abs(Analysis.winPercent(200) + Analysis.winPercent(-200) - 100) < 1e-6,
-    'win chances are symmetric'
-  );
-
-  assert(Analysis.classify(0).key === 'best', '0 cp lost = best');
-  assert(Analysis.classify(45).key === 'good', '45 cp lost = good');
-  assert(Analysis.classify(80).key === 'inaccuracy', '80 cp lost = inaccuracy');
-  assert(Analysis.classify(150).key === 'mistake', '150 cp lost = mistake');
-  assert(Analysis.classify(600).key === 'blunder', '600 cp lost = blunder');
-
-  assert(Math.abs(Analysis.moveAccuracy(50, 50) - 100) < 0.1, 'no loss = ~100% accuracy');
-  const hangQueen = Analysis.moveAccuracy(Analysis.winPercent(0), Analysis.winPercent(-900));
-  assert(hangQueen < 25, 'hanging a queen tanks accuracy (' + hangQueen.toFixed(1) + '%)');
-  assert(
-    Analysis.moveAccuracy(50, 45) > Analysis.moveAccuracy(50, 30),
-    'smaller drops score higher'
-  );
 }
 
 async function testWorstFish() {
@@ -655,33 +675,6 @@ async function testDrawFish() {
     res = await v.pickMove(s, { engine: engineWith(null), fen: 'x', legalCount: 5 });
     assert(res === null, 'falls through gracefully when ranking is unavailable');
   }
-}
-
-console.log('Analysis scoring');
-{
-  const { Analysis } = require(path.join(__dirname, '..', 'js', 'analysis.js'));
-  assert(Math.abs(Analysis.winPercent(0) - 50) < 1e-6, 'even position = 50% win chance');
-  assert(Analysis.winPercent(300) > 70, '+3 pawns is a large advantage (' +
-    Analysis.winPercent(300).toFixed(1) + '%)');
-  assert(Analysis.winPercent(-300) < 30, '-3 pawns is losing');
-  assert(
-    Math.abs(Analysis.winPercent(200) + Analysis.winPercent(-200) - 100) < 1e-6,
-    'win chances are symmetric'
-  );
-
-  assert(Analysis.classify(0).key === 'best', '0 cp lost = best');
-  assert(Analysis.classify(45).key === 'good', '45 cp lost = good');
-  assert(Analysis.classify(80).key === 'inaccuracy', '80 cp lost = inaccuracy');
-  assert(Analysis.classify(150).key === 'mistake', '150 cp lost = mistake');
-  assert(Analysis.classify(600).key === 'blunder', '600 cp lost = blunder');
-
-  assert(Math.abs(Analysis.moveAccuracy(50, 50) - 100) < 0.1, 'no loss = ~100% accuracy');
-  const hangQueen = Analysis.moveAccuracy(Analysis.winPercent(0), Analysis.winPercent(-900));
-  assert(hangQueen < 25, 'hanging a queen tanks accuracy (' + hangQueen.toFixed(1) + '%)');
-  assert(
-    Analysis.moveAccuracy(50, 45) > Analysis.moveAccuracy(50, 30),
-    'smaller drops score higher'
-  );
 }
 
 // Async suites run last, then the overall result is reported.
