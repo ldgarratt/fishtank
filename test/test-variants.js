@@ -79,6 +79,56 @@ console.log('TiredFish');
   assert(s.elo === ELO_MAX - 40 * 50, '40 moves -> ' + s.elo);
 }
 
+console.log('ClockFish');
+{
+  const v = VARIANTS.clockfish;
+  assert(v.maxThinkMs === 5000, 'five seconds is full strength');
+  assert(v.eloForThinkTime(5000) === ELO_MAX, '5.0s → ' + ELO_MAX);
+  assert(v.eloForThinkTime(20000) === ELO_MAX, 'thinking longer cannot exceed the ceiling');
+  assert(v.eloForThinkTime(0) === ELO_FLOOR, 'an instant reply → the floor');
+  assert(v.eloForThinkTime(-500) === ELO_FLOOR, 'a negative clock cannot go below it');
+  const half = v.eloForThinkTime(2500);
+  assert(Math.abs(half - (ELO_FLOOR + ELO_MAX) / 2) < 2, 'half the time → half the range');
+  // Strictly increasing, or "think longer" would not reliably mean "play better".
+  let rising = true;
+  for (let ms = 0; ms < 5000; ms += 100) {
+    if (v.eloForThinkTime(ms + 100) <= v.eloForThinkTime(ms)) rising = false;
+  }
+  assert(rising, 'every extra moment makes it stronger');
+
+  // The clock has to run from its reply, not from your previous move: the time
+  // it spends thinking is not time you spent thinking.
+  const s = { elo: v.baseElo, moveCount: 0 };
+  v.init(s);
+  const started = s.clockStart;
+  assert(typeof started === 'number', 'the clock starts with the game');
+  s.clockStart = Date.now() - 3000; // pretend you dithered for three seconds
+  const evs = v.onPlayerMove(s);
+  assert(Math.abs(s.elo - v.eloForThinkTime(3000)) < 30,
+    'a three-second think sets roughly ' + v.eloForThinkTime(3000) + ' (got ' + s.elo + ')');
+  assert(/3\.0s/.test(evs[0]), 'the feed reports the time you took');
+  const before = s.clockStart;
+  v.onEngineMovePlayed(s);
+  assert(s.clockStart > before, 'its reply restarts your clock');
+
+  // The bar has to climb while you sit there, or you cannot judge five seconds.
+  s.clockStart = Date.now() - 1000;
+  const at1s = v.liveElo(s);
+  s.clockStart = Date.now() - 4000;
+  const at4s = v.liveElo(s);
+  assert(at4s > at1s, `the live readout rises as you think (${at1s} → ${at4s})`);
+  assert(Math.abs(at1s - v.eloForThinkTime(1000)) < 30,
+    'the live readout agrees with the rating it will actually use');
+
+  const src = require('fs').readFileSync(
+    path.join(__dirname, '..', 'js', 'app.js'), 'utf8'
+  );
+  assert(/startClockTicker\(\);/.test(src) && /stopClockTicker\(\);/.test(src),
+    'the app starts and stops the ticker');
+  assert(/clearInterval\(clockTimer\)/.test(src),
+    'the ticker is cleared, not left running between games');
+}
+
 console.log('DrunkFish');
 {
   const v = VARIANTS.drunkfish;

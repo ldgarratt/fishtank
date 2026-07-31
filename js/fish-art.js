@@ -387,6 +387,22 @@ const FishArt = (() => {
          <path d="M21 79L79 21" stroke="#e53935" stroke-width="11" stroke-linecap="round"/>`
       ),
 
+    // Stopwatch, for the bot whose rating is set by your own clock.
+    stopwatch: () =>
+      svg(
+        '0 0 80 92',
+        `<rect x="33" y="2" width="14" height="12" rx="4" fill="#546e7a"/>
+         <rect x="60" y="14" width="12" height="8" rx="3" fill="#546e7a" transform="rotate(38 66 18)"/>
+         <circle cx="40" cy="54" r="35" fill="#455a64"/>
+         <circle cx="40" cy="54" r="29" fill="#fafafa"/>
+         <g stroke="#455a64" stroke-width="3" stroke-linecap="round">
+           <path d="M40 29v5M40 74v5M15 54h5M60 54h5"/>
+         </g>
+         <path d="M40 54V33M40 54l15 11" stroke="#e53935" stroke-width="5"
+               stroke-linecap="round" fill="none"/>
+         <circle cx="40" cy="54" r="4.5" fill="#e53935"/>`
+      ),
+
     // Sits between two piece silhouettes: "this one moves like both".
     plusBadge: () =>
       svg(

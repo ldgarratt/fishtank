@@ -14,6 +14,7 @@ installs. The app just adjusts the engine's strength settings between moves.
 | **PanicFish** | Loses **300 Elo every time you check its king**. Sacrifice everything. Hunt the king. |
 | **TiltFish** | Loses **200 Elo every time you capture a piece**. Trade everything. Watch it crumble. |
 | **TiredFish** | Loses **50 Elo every move it plays**. Survive the opening, win the endgame. |
+| **ClockFish** | Its rating is **your clock**: instant replies face a beginner, five seconds faces the full 3190. |
 | **DrunkFish** | Full strength, but a flat **5% chance each move of blundering** — throwing away at least two pawns. |
 | **RageFish** | Starts at **200 Elo**, playing near-random moves. **Gains 200 Elo every time you capture a piece**. Don't take the bait. |
 | **GamblerFish** | **Re-rolls its Elo every 3 moves** — beginner to superhuman — and holds it in between. |

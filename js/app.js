@@ -59,6 +59,7 @@
   // Maia replies in milliseconds; Stockfish takes 600–2000 ms. Without a floor
   // the two feel like different games.
   const MAIA_MIN_THINK_MS = 500;
+  let clockTimer = null; // ticks the strength bar for variants rated on your clock
 
   /* ---------- variant picker ---------- */
 
@@ -146,6 +147,7 @@
 
     els.picker.classList.add('hidden');
     els.game.classList.remove('hidden');
+    startClockTicker();
     els.oppDesc.textContent = variant.description;
     els.avatar.innerHTML = FishArt.avatar(variant);
     els.log.innerHTML = '';
@@ -173,6 +175,7 @@
   }
 
   function showPicker() {
+    stopClockTicker();
     els.game.classList.add('hidden');
     els.picker.classList.remove('hidden');
   }
@@ -1112,6 +1115,25 @@
     div.className = 'log-event';
     div.textContent = text;
     els.log.prepend(div);
+  }
+
+  /**
+   * Some bots are rated on how long *you* take (ClockFish), so the strength
+   * readout has to keep moving while the board sits waiting for you.
+   */
+  function startClockTicker() {
+    stopClockTicker();
+    if (!variant || !variant.liveElo) return;
+    clockTimer = setInterval(() => {
+      if (!game || gameOver || thinking || game.turn() !== playerColor) return;
+      vstate.elo = variant.liveElo(vstate);
+      updateEloUI();
+    }, 120);
+  }
+
+  function stopClockTicker() {
+    if (clockTimer) clearInterval(clockTimer);
+    clockTimer = null;
   }
 
   function setStatus(text) {

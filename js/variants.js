@@ -187,6 +187,49 @@ const VARIANTS = {
     },
   },
 
+  clockfish: {
+    id: 'clockfish',
+    name: 'ClockFish',
+    emoji: '⏱️',
+    tagline: 'The longer you think, the stronger it answers. Five seconds is full strength.',
+    description:
+      'Its rating is whatever your clock says. Answer instantly and it plays ' +
+      'like a beginner; take five seconds or more and you face the full 3190. ' +
+      'The clock restarts the moment it replies.',
+    baseElo: 1500, // only used for its very first move, when you play Black
+    maxThinkMs: 5000,
+    demo: [['0.4s', '347', '⏱️'], ['2.0s', '1336', '⏱️'], ['5.0s', '3190', '⏱️']],
+    art: { props: [['stopwatch', 64, 38, 30, 8]] },
+
+    /** Elo from time spent, linear between the floor and full strength. */
+    eloForThinkTime(ms) {
+      const frac = Math.min(1, Math.max(0, ms) / this.maxThinkMs);
+      return clampElo(Math.round(ELO_FLOOR + frac * (ELO_MAX - ELO_FLOOR)));
+    },
+
+    init(state) {
+      // Your clock starts the moment the board appears.
+      state.clockStart = Date.now();
+    },
+    /**
+     * Polled while it is your move, so the strength bar visibly climbs as you
+     * sit there. Without it you would be guessing at your own five seconds.
+     */
+    liveElo(state) {
+      return this.eloForThinkTime(Date.now() - (state.clockStart || Date.now()));
+    },
+    onPlayerMove(state) {
+      const ms = Date.now() - (state.clockStart || Date.now());
+      state.elo = this.eloForThinkTime(ms);
+      return [`⏱️ You thought for ${(ms / 1000).toFixed(1)}s → ${state.elo} Elo`];
+    },
+    onEngineMovePlayed(state) {
+      // Its reply hands the move back, so your clock starts again here rather
+      // than when your last move ended — its own thinking is not your time.
+      state.clockStart = Date.now();
+    },
+  },
+
   drunkfish: {
     id: 'drunkfish',
     name: 'DrunkFish',
