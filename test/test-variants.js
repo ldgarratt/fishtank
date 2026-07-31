@@ -31,15 +31,22 @@ console.log('PanicFish');
   const s = { elo: v.baseElo, moveCount: 0 };
   assert(v.baseElo === ELO_MAX, 'starts at max elo ' + ELO_MAX);
   v.onPlayerMove(s, quiet, inCheck);
-  assert(s.elo === ELO_MAX - 200, 'check costs 200');
+  assert(s.elo === ELO_MAX - 500, 'check costs 500');
   v.onPlayerMove(s, quiet, notInCheck);
-  assert(s.elo === ELO_MAX - 200, 'quiet move costs nothing');
+  assert(s.elo === ELO_MAX - 500, 'quiet move costs nothing');
+  v.onPlayerMove(s, quiet, inCheck);
+  v.onPlayerMove(s, quiet, inCheck);
+  assert(s.elo === ELO_MAX - 3 * 500, 'three checks -> ' + s.elo);
   for (let i = 0; i < 12; i++) v.onPlayerMove(s, quiet, inCheck);
-  assert(s.elo === ELO_MAX - 13 * 200, '13 checks -> ' + s.elo + ' (goes below engine floor)');
+  assert(s.elo === ELO_FLOOR, 'a hail of checks bottoms out at the floor');
   assert(clampUciElo(s.elo) === ELO_MIN, 'uci elo clamps at floor');
   assert(
-    randomMoveProbability(s.elo) === 0,
+    randomMoveProbability(1000) === 0,
     'below the engine floor it still plays real (skill-noised) moves, not random ones'
+  );
+  assert(
+    randomMoveProbability(s.elo) <= 0.12,
+    'only at the very floor is a little pure randomness mixed in'
   );
 }
 

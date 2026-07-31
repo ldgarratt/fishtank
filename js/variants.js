@@ -87,15 +87,15 @@ const VARIANTS = {
     id: 'panicfish',
     name: 'PanicFish',
     emoji: '😱',
-    tagline: 'Loses 200 Elo every time you check its king.',
-    description: 'Starts at 3190 Elo. Loses 200 Elo each time you give check.',
+    tagline: 'Loses 500 Elo every time you check its king.',
+    description: 'Starts at 3190 Elo. Loses 500 Elo each time you give check.',
     baseElo: ELO_MAX,
-    demo: [['♗b5+', '2990', '−200'], ['♕h5+', '2790', '−200'], ['♖e8+', '2590', '−200']],
+    demo: [['♗b5+', '2690', '−500'], ['♕h5+', '2190', '−500'], ['♖e8+', '1690', '−500']],
     art: { anim: 'shake', props: [['alarmBell', 66, 24, 28, 12], ['exclaim', 84, 54, 11, 8], ['sweat', 34, 62, 12, -25], ['sweat', 62, 68, 10, 20]] },
     onPlayerMove(state, move, game) {
       if (game.in_check()) {
-        state.elo = clampElo(state.elo - 200);
-        return [`♚ Check: −200 Elo → ${state.elo}`];
+        state.elo = clampElo(state.elo - 500);
+        return [`♚ Check: −500 Elo → ${state.elo}`];
       }
     },
   },
@@ -338,7 +338,7 @@ const VARIANTS = {
       'chess and does not understand the rule — exploit that.',
     baseElo: 2200,
     demo: [['♗b5+', '✓', '+1'], ['♕h5+', '✓✓', '+1'], ['♖e8+', '✓✓✓', 'win']],
-    art: { props: [['crown', 42, 71, 32, -28], ['checkMarks', 76, 44, 15, 0]] },
+    art: { props: [['checkMarks', 74, 44, 18, 0]] },
     init(state) {
       state.playerChecks = 0;
       state.engineChecks = 0;

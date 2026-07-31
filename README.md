@@ -2,7 +2,7 @@
 
 Play chess in your browser against Stockfish bots whose strength changes
 mid-game depending on what happens on the board. Check PanicFish and it drops
-200 Elo. Capture against TiltFish and it tilts. Feed RageFish and it wakes up.
+500 Elo. Capture against TiltFish and it tilts. Feed RageFish and it wakes up.
 
 Every bot is the real Stockfish engine running in WebAssembly — no forks, no
 installs. The app just adjusts the engine's strength settings between moves.
@@ -11,7 +11,7 @@ installs. The app just adjusts the engine's strength settings between moves.
 
 | Variant | | Condition |
 |---|---|---|
-| **PanicFish** | 😱 | Loses **200 Elo every time you check its king**. Sacrifice everything. Hunt the king. |
+| **PanicFish** | 😱 | Loses **500 Elo every time you check its king**. Sacrifice everything. Hunt the king. |
 | **TiltFish** | 🤬 | Loses **200 Elo every time you capture a piece**. Trade everything. Watch it crumble. |
 | **TiredFish** | 😴 | Loses **50 Elo every move it plays**. Survive the opening, win the endgame. |
 | **DrunkFish** | 🍺 | Full strength, but a **growing chance each move of playing a completely random move**. |
@@ -79,7 +79,7 @@ the app reconfigures Stockfish before every engine move:
   Only below ~250 Elo is a little pure randomness (max 12%) mixed in; those
   moves are marked 🎲 in the feed.
 
-**Every search is time-limited, never depth-limited** — 1200 ms for a normal
+**Every search is time-limited, never depth-limited** — 800 ms for a normal
 move, and the same budget when a bot ranks all legal moves (DrawFish,
 WorstFish). Fixed depth would make weak bots answer instantly and strong ones
 stall, and it makes strength depend on the machine.
