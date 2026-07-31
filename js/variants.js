@@ -135,22 +135,35 @@ const VARIANTS = {
     id: 'drunkfish',
     name: 'DrunkFish',
     emoji: '🍺',
-    tagline: 'Full strength, but increasingly likely to play a random move.',
+    tagline: 'Full strength, but blunders 5% of the time.',
     description:
-      'Plays at 3190 Elo, but each of its moves has a chance of being replaced ' +
-      'by a random legal move: 0% at the start, +2% per move, capped at 80%.',
+      'Plays at 3190 Elo. Every move has a flat 5% chance of being a blunder ' +
+      'instead — a move that throws away at least two pawns of evaluation. ' +
+      'Roughly one blunder every twenty moves, at no warning.',
     baseElo: ELO_MAX,
-    demo: [['♗d3', 'best', ''], ['♔e2', 'best', ''], ['♞a3', '??', '🎲']],
+    demo: [['♗d3', 'best', ''], ['♔e2', 'best', ''], ['♞a3', '??', '🍺']],
     art: { anim: 'wobble', props: [['beerMug', 70, 60, 28, 8], ['sunglasses', 53, 82, 30, -35]] },
-    extraRandomChance(state) {
-      // +2% per engine move played, capped at 80%.
-      return Math.min(0.8, state.moveCount * 0.02);
-    },
-    onEngineTurnStart(state) {
-      const pct = Math.round(Math.min(0.8, state.moveCount * 0.02) * 100);
-      if (state.moveCount > 0 && state.moveCount % 5 === 0) {
-        return [`🍺 Random-move chance is now ${pct}%`];
-      }
+    blunderChance: 0.05,
+    // A blunder has to actually cost something: a random legal move is often
+    // just a harmless shuffle, so instead the engine ranks every move and one
+    // of the genuinely bad ones is played. Only the 5% of moves that trigger
+    // pay for the extra search.
+    async pickMove(state, ctx) {
+      if (Math.random() >= this.blunderChance) return null; // sober: play normally
+      const ranked = await ctx.engine.rankMoves(ctx.fen, ctx.legalCount);
+      if (!ranked || ranked.length < 2) return null;
+
+      const best = ranked[0].score;
+      const bad = ranked.filter((r) => best - r.score >= 200);
+      // Nothing bad enough available (forced or dead-drawn): take the worst
+      // there is rather than pretending to blunder.
+      const pool = bad.length ? bad : [ranked[ranked.length - 1]];
+      const choice = pool[Math.floor(Math.random() * pool.length)];
+      const lost = ((best - choice.score) / 100).toFixed(1);
+      return {
+        uci: choice.move,
+        events: [`🍺 DrunkFish blunders — throws away ${lost} pawns`],
+      };
     },
   },
 

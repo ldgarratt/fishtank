@@ -11,6 +11,7 @@ const {
 ));
 
 let failures = 0;
+let testDrunkFishBlunders = async () => {};
 function assert(cond, msg) {
   if (cond) console.log('  ok - ' + msg);
   else {
@@ -79,9 +80,55 @@ console.log('TiredFish');
 console.log('DrunkFish');
 {
   const v = VARIANTS.drunkfish;
-  assert(v.extraRandomChance({ moveCount: 0 }) === 0, 'sober at move 0');
-  assert(Math.abs(v.extraRandomChance({ moveCount: 10 }) - 0.2) < 1e-9, '20% at move 10');
-  assert(v.extraRandomChance({ moveCount: 100 }) === 0.8, 'capped at 80%');
+  assert(v.blunderChance === 0.05, 'blunders 5% of the time');
+  assert(!v.extraRandomChance, 'no longer ramps up a random-move chance');
+  assert(v.baseElo === ELO_MAX, 'otherwise plays at full strength');
+
+  // The ranked list is best-first; anything 200cp or more below the best move
+  // counts as a blunder worth playing.
+  const ranked = [
+    { move: 'd1h5', score: 40 },
+    { move: 'g1f3', score: 10 },
+    { move: 'b1c3', score: -260 }, // -3.00 from best
+    { move: 'f1a6', score: -900 }, // -9.40 from best
+  ];
+  const ctx = { engine: { rankMoves: async () => ranked }, fen: 'x', legalCount: 4 };
+  const badMoves = new Set(['b1c3', 'f1a6']);
+
+  // Registered with the async runner at the bottom so its failures are counted.
+  testDrunkFishBlunders = async () => {
+    // Forced to blunder: only genuinely bad moves are eligible.
+    const drunk = Object.assign({}, v, { blunderChance: 1 });
+    for (let i = 0; i < 40; i++) {
+      const res = await drunk.pickMove({}, ctx);
+      if (!res || !badMoves.has(res.uci)) {
+        assert(false, 'a blunder is always a move that loses real material');
+        return;
+      }
+    }
+    assert(true, 'a blunder is always a move that loses real material');
+
+    const res = await drunk.pickMove({}, ctx);
+    assert(/throws away/.test(res.events[0]), 'the feed says what it cost');
+
+    // Sober: hands control back rather than choosing a move.
+    const sober = Object.assign({}, v, { blunderChance: 0 });
+    assert(await sober.pickMove({}, ctx) === null,
+      'when sober it defers to the normal engine search');
+
+    // Nothing bad enough on offer — must not invent a blunder.
+    const quiet = [{ move: 'a2a3', score: 10 }, { move: 'b2b3', score: 0 }];
+    const res2 = await drunk.pickMove({}, {
+      engine: { rankMoves: async () => quiet }, fen: 'x', legalCount: 2,
+    });
+    assert(res2.uci === 'b2b3', 'with no real blunder available it plays the worst move');
+
+    const forced = await drunk.pickMove({}, {
+      engine: { rankMoves: async () => [{ move: 'e1e2', score: -50 }] },
+      fen: 'x', legalCount: 1,
+    });
+    assert(forced === null, 'a forced move is played normally');
+  };
 }
 
 console.log('RageFish');
@@ -855,6 +902,7 @@ console.log('DragonFish search');
 
 // Async suites run last, then the overall result is reported.
 (async () => {
+  await testDrunkFishBlunders();
   await testDrawFish();
   await testWorstFish();
   await testPityFish();
