@@ -22,6 +22,7 @@ installs. The app just adjusts the engine's strength settings between moves.
 | **PacifistFish** | **Loses 300 Elo every time IT captures one of your pieces.** Bait it into trades. |
 | **DrawFish** | Plays the move that keeps the evaluation **closest to 0.00**. It isn't trying to win — it's trying to draw. |
 | **WorstFish** | Plays the **worst legal move** in every position. Hangs everything, walks into mate. |
+| **BotezFish** | Full strength, except that **if it can hang its queen, it must**. The Botez Gambit, compulsory. |
 | **PityFish** | Starts at 3190. **Loses 500 Elo whenever your move is the single worst legal move** in the position. |
 | **CowardFish** | **Loses 400 Elo for each of your pieces on its half of the board.** March forward. |
 | **QueenlessFish** | Full strength, but **starts without its queen**. The classical handicap. |

@@ -14,6 +14,7 @@ let failures = 0;
 let testDrunkFishBlunders = async () => {};
 let testAnalysisBestMoves = async () => {};
 let testMaiaTimeout = async () => {};
+let testBotezFish = async () => {};
 function assert(cond, msg) {
   if (cond) console.log('  ok - ' + msg);
   else {
@@ -77,6 +78,79 @@ console.log('TiredFish');
     v.onEngineTurnStart(s);
   }
   assert(s.elo === ELO_MAX - 40 * 50, '40 moves -> ' + s.elo);
+}
+
+console.log('BotezFish');
+{
+  const v = VARIANTS.botezfish;
+  const vendored = path.join(__dirname, '..', 'vendor', 'chess.js');
+  assert(v.baseElo === ELO_MAX, 'otherwise it plays at full strength');
+
+  if (!require('fs').existsSync(vendored)) {
+    console.log('  skip - chess.js not vendored (run engine/get-engine.sh)');
+  } else {
+    const mod = require(vendored);
+    const ChessCtor = mod.Chess || mod;
+
+    // Black queen on d8 against a rook on d1 and a pawn on e2: several ways to
+    // put the queen where White can legally take it.
+    const offers = new ChessCtor('3qk3/8/8/8/8/8/4P3/3RK3 b - - 0 1');
+    const sacs = v.queenSacrifices(offers);
+    assert(sacs.length > 0, `finds the queen offers (${sacs.length} of them)`);
+    assert(sacs.every((m) => m.piece === 'q'), 'every offer is a queen move');
+    assert(offers.fen() === '3qk3/8/8/8/8/8/4P3/3RK3 b - - 0 1',
+      'looking for sacrifices leaves the position untouched');
+    // Qxd1 is capturable by the king; Qd3 by the e2 pawn.
+    const sacSquares = new Set(sacs.map((m) => m.to));
+    assert(sacSquares.has('d1'), 'taking the defended rook counts');
+    assert(sacSquares.has('d3'), 'stepping in front of a pawn counts');
+    // The whole d-file is covered by that rook, so Qd7 is an offer too; c7 is
+    // genuinely out of reach of rook, pawn and king alike.
+    assert(sacSquares.has('d7'), 'the rook covers the whole open file');
+    assert(!sacSquares.has('c7'), 'a genuinely safe queen move is not an offer');
+
+    // A lone enemy king it can never reach: nothing to sacrifice to.
+    const safe = new ChessCtor('3qk3/8/8/8/8/8/8/K7 b - - 0 1');
+    assert(v.queenSacrifices(safe).length === 0,
+      'no offer exists when the queen cannot be taken anywhere');
+
+    // No queen at all — the gimmick has to switch itself off.
+    const queenless = new ChessCtor('4k3/8/8/8/8/8/4P3/3RK3 b - - 0 1');
+    assert(v.queenSacrifices(queenless).length === 0, 'no queen, no sacrifice');
+
+    testBotezFish = async () => {
+      const ctxFor = (g, engine) => ({
+        game: g, engine, fen: g.fen(), legalCount: g.moves().length,
+      });
+      const res = await v.pickMove({}, ctxFor(offers, null));
+      assert(res && sacs.some((m) => m.from + m.to === res.uci),
+        'it plays one of the offers when one exists');
+      assert(/hangs the queen/.test(res.events[0]), 'the feed calls it out');
+
+      assert(await v.pickMove({}, ctxFor(safe, null)) === null,
+        'with the queen safe it defers to the normal engine');
+      assert(await v.pickMove({}, ctxFor(queenless, null)) === null,
+        'once the queen is gone it plays normally again');
+
+      // Given a choice, it takes the offer the engine rates highest.
+      const engine = {
+        rankMoves: async () => [
+          { move: 'd8c7', score: 500 }, // best move, but the queen is safe there
+          { move: 'd8d1', score: 200 }, // the good sacrifice
+          { move: 'd8d3', score: -400 }, // the terrible one
+        ],
+      };
+      const picked = await v.pickMove({}, ctxFor(offers, engine));
+      assert(picked.uci === 'd8d1',
+        'it picks the best sacrifice, not the best move (played ' + picked.uci + ')');
+
+      // A broken engine must not stop it sacrificing.
+      const broken = { rankMoves: async () => { throw new Error('nope'); } };
+      const fallback = await v.pickMove({}, ctxFor(offers, broken));
+      assert(fallback && sacSquares.has(fallback.uci.slice(2, 4)),
+        'it still sacrifices when the ranking fails');
+    };
+  }
 }
 
 console.log('ClockFish');
@@ -1407,6 +1481,7 @@ console.log('DragonFish search');
   await testDrunkFishBlunders();
   await testAnalysisBestMoves();
   await testMaiaTimeout();
+  await testBotezFish();
   await testDrawFish();
   await testWorstFish();
   await testPityFish();

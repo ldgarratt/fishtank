@@ -393,6 +393,66 @@ const VARIANTS = {
     },
   },
 
+  botezfish: {
+    id: 'botezfish',
+    name: 'BotezFish',
+    emoji: '👑',
+    tagline: 'If it can hang its queen, it must.',
+    description:
+      'Full strength in every position where its queen is safe. But whenever ' +
+      'a move exists that puts its queen where you can legally take it, it is ' +
+      'obliged to play one. Once the queen is gone it plays normally again.',
+    baseElo: ELO_MAX,
+    demo: [['♗d3', '3190', ''], ['♕xf7', 'sac', '👑'], ['♗e3', '3190', '']],
+    // A queen knocked flat on its face.
+    art: { props: [['pieceQueen', 58, 46, 26, 78], ['exclaim', 82, 62, 12, 12]] },
+
+    /**
+     * Every move that leaves the queen legally capturable. "Legally" matters:
+     * chess.js's move list already accounts for pins, so a defender that
+     * cannot actually take does not count as a refutation.
+     */
+    queenSacrifices(game) {
+      const sacs = [];
+      for (const m of game.moves({ verbose: true })) {
+        if (m.piece !== 'q') continue;
+        game.move(m.san);
+        const takeable = game
+          .moves({ verbose: true })
+          .some((reply) => reply.to === m.to && reply.captured === 'q');
+        game.undo();
+        if (takeable) sacs.push(m);
+      }
+      return sacs;
+    },
+
+    async pickMove(state, ctx) {
+      const sacs = this.queenSacrifices(ctx.game);
+      if (!sacs.length) return null; // nothing to give away: play normally
+
+      const uciOf = (m) => m.from + m.to + (m.promotion || '');
+      let choice = sacs[0];
+      // Obliged to give the queen, but not obliged to pick the worst way of
+      // doing it — the engine ranks the offerings and takes the best.
+      if (sacs.length > 1 && ctx.engine) {
+        try {
+          const ranked = await ctx.engine.rankMoves(ctx.fen, ctx.legalCount);
+          if (ranked) {
+            const allowed = new Set(sacs.map(uciOf));
+            const best = ranked.find((r) => allowed.has(r.move));
+            if (best) choice = sacs.find((m) => uciOf(m) === best.move) || choice;
+          }
+        } catch (e) {
+          // Ranking is a nicety; the sacrifice is the point.
+        }
+      }
+      return {
+        uci: uciOf(choice),
+        events: [`👑 Botez Gambit — ${choice.san} hangs the queen`],
+      };
+    },
+  },
+
   pityfish: {
     id: 'pityfish',
     name: 'PityFish',
