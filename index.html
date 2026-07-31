@@ -13,7 +13,11 @@
   <meta property="og:type" content="website" />
   <meta property="og:url" content="https://ldgarratt.github.io/fishtank/" />
   <meta property="og:image" content="https://ldgarratt.github.io/fishtank/img/stockfish.png" />
-  <link rel="stylesheet" href="css/style.css?v=44" />
+  <!-- Bumped on every change, together with version.txt. The app compares the
+       two at boot: query strings only bust the cache once this file itself is
+       re-fetched, and browsers happily serve a stale index.html for hours. -->
+  <script>window.FISHTANK_VERSION = '45';</script>
+  <link rel="stylesheet" href="css/style.css?v=45" />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80'>🐟</text></svg>" />
 </head>
 <body>
@@ -115,16 +119,16 @@
         ['vendor/chess.js',
          'https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js',
          'https://cdn.jsdelivr.net/npm/chess.js@0.10.3/chess.js'],
-        ['js/variants.js?v=44'],
-        ['js/engine.js?v=44'],
-        ['js/sound.js?v=44'],
-        ['js/analysis.js?v=44'],
-        ['js/maia-encode.js?v=44'],
-        ['js/maia.js?v=44'],
-        ['js/fish-art.js?v=44'],
-        ['js/fairy-engine.js?v=44'],
-        ['js/dragon.js?v=44'],
-        ['js/app.js?v=44'],
+        ['js/variants.js?v=45'],
+        ['js/engine.js?v=45'],
+        ['js/sound.js?v=45'],
+        ['js/analysis.js?v=45'],
+        ['js/maia-encode.js?v=45'],
+        ['js/maia.js?v=45'],
+        ['js/fish-art.js?v=45'],
+        ['js/fairy-engine.js?v=45'],
+        ['js/dragon.js?v=45'],
+        ['js/app.js?v=45'],
       ]);
     })();
   </script>

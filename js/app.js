@@ -1092,7 +1092,39 @@
 
   /* ---------- boot ---------- */
 
+  /**
+   * Detect a stale cached index.html and reload once.
+   *
+   * The ?v= query strings on the scripts are written *inside* index.html, so
+   * they are useless while the browser is serving a cached index.html — it
+   * just keeps asking for the old versions. version.txt is fetched with
+   * no-store, so it always reflects what is actually deployed.
+   */
+  async function reloadIfStale() {
+    const mine = window.FISHTANK_VERSION;
+    if (!mine) return;
+    try {
+      const res = await fetch('version.txt?t=' + Date.now(), { cache: 'no-store' });
+      if (!res.ok) return;
+      const latest = (await res.text()).trim();
+      if (!latest || latest === String(mine)) return;
+      // Reload at most once per version, so a misconfigured deploy can never
+      // put the page in a refresh loop.
+      const key = 'fishtank-reloaded-for';
+      if (sessionStorage.getItem(key) === latest) {
+        console.warn(`Cached page is v${mine}, deployed is v${latest}. ` +
+          'A hard refresh (Cmd/Ctrl+Shift+R) will pick it up.');
+        return;
+      }
+      sessionStorage.setItem(key, latest);
+      location.reload();
+    } catch (e) {
+      // Offline or file:// — keep running with whatever is cached.
+    }
+  }
+
   async function boot() {
+    reloadIfStale(); // deliberately not awaited: never delay the first paint
     buildPicker();
     els.btnNew.addEventListener('click', () => startGame(variant.id, false));
     els.btnRematch.addEventListener('click', () => startGame(variant.id, false));

@@ -136,10 +136,7 @@ const VARIANTS = {
     name: 'DrunkFish',
     emoji: '🍺',
     tagline: 'Full strength, but blunders 5% of the time.',
-    description:
-      'Plays at 3190 Elo. Every move has a flat 5% chance of being a blunder ' +
-      'instead — a move that throws away at least two pawns of evaluation. ' +
-      'Roughly one blunder every twenty moves, at no warning.',
+    description: 'Plays at 3190 Elo. Every move has a flat 5% chance of being a blunder.',
     baseElo: ELO_MAX,
     demo: [['♗d3', 'best', ''], ['♔e2', 'best', ''], ['♞a3', '??', '🍺']],
     art: { anim: 'wobble', props: [['beerMug', 70, 60, 28, 8], ['sunglasses', 53, 82, 30, -35]] },

@@ -725,6 +725,28 @@ async function testDrawFish() {
   }
 }
 
+console.log('Cache versioning');
+{
+  // A stale index.html serves stale scripts no matter what the ?v= says, so
+  // the page checks version.txt at boot. These two must never disagree.
+  const fs = require('fs');
+  const root = path.join(__dirname, '..');
+  const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+  const txt = fs.readFileSync(path.join(root, 'version.txt'), 'utf8').trim();
+
+  const declared = html.match(/window\.FISHTANK_VERSION = '(\d+)'/);
+  assert(!!declared, 'index.html declares its version to the app');
+  assert(declared && declared[1] === txt,
+    `index.html (v${declared && declared[1]}) matches version.txt (v${txt})`);
+
+  const queries = [...html.matchAll(/\?v=(\d+)/g)].map((m) => m[1]);
+  assert(queries.length > 0, 'assets are cache-busted with ?v=');
+  assert(new Set(queries).size === 1,
+    'every asset uses the same ?v= (' + [...new Set(queries)].join(', ') + ')');
+  assert(queries[0] === txt, `?v=${queries[0]} matches version.txt (v${txt})`);
+  assert(/^\d+$/.test(txt), 'version.txt holds a bare number and nothing else');
+}
+
 console.log('Best-move arrows');
 {
   // The geometry helpers are pure, so they are pulled out of app.js and run
