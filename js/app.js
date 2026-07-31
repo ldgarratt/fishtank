@@ -56,6 +56,9 @@
   let reviewGame = null; // chess.js replay used while reviewing
   let liveStatus = ''; // status text to restore when leaving review
   let analysisReport = null; // last completed analysis, drives the arrows
+  // Maia replies in milliseconds; Stockfish takes 600–2000 ms. Without a floor
+  // the two feel like different games.
+  const MAIA_MIN_THINK_MS = 500;
 
   /* ---------- variant picker ---------- */
 
@@ -701,13 +704,21 @@
           setStatus(`Downloading Maia… ${pct}%`);
         }
       });
+      // Restore the status either way: leaving "Downloading Maia… 100%" on
+      // screen after a failure made a clean fallback look like a hang.
+      setStatus(`${variant.name} is thinking…`);
       if (got) {
-        setStatus(`${variant.name} is thinking…`);
+        const startedAt = Date.now();
         const res = await MaiaEngine.pickMove(game.fen(), Math.round(vstate.elo));
         if (res && game.moves({ verbose: true }).some(
           (m) => m.from + m.to + (m.promotion || '') === res.uci
         )) {
           maiaMove = res;
+          // One neural-network pass takes a few milliseconds, so Maia answers
+          // instantly and the game feels broken rather than fast. Hold the move
+          // briefly so it reads as an opponent taking a turn.
+          const elapsed = Date.now() - startedAt;
+          if (elapsed < MAIA_MIN_THINK_MS) await sleep(MAIA_MIN_THINK_MS - elapsed);
         }
       }
     }

@@ -28,8 +28,34 @@ const MaiaEngine = (() => {
   const pending = new Map();
   let onProgress = null;
 
+  // A single forward pass is milliseconds on a laptop, but the model is 44 MB
+  // and phones routinely run out of memory loading it. If the worker dies or
+  // stalls, every in-flight request has to fail loudly rather than leaving the
+  // game waiting on a promise that will never settle.
+  const INFER_TIMEOUT_MS = 15000;
+  const LOAD_TIMEOUT_MS = 120000;
+
   function inBand(elo) {
     return elo >= MIN_ELO && elo <= MAX_ELO;
+  }
+
+  /** Reject everything outstanding and stop using Maia for this session. */
+  function failAll(reason) {
+    disabled = true;
+    ready = false;
+    for (const [, p] of pending) p.reject(new Error(reason));
+    pending.clear();
+  }
+
+  /**
+   * Whether this device should even attempt a 44 MB model. Phones that report
+   * little memory will typically OOM part-way through loading the session,
+   * which used to look like the game hanging at "100%".
+   */
+  function deviceCanCope() {
+    const mem = navigator.deviceMemory; // GiB, coarse; undefined on Safari
+    if (typeof mem === 'number' && mem < 4) return false;
+    return true;
   }
 
   async function loadTables() {
@@ -43,7 +69,7 @@ const MaiaEngine = (() => {
   }
 
   function spawn() {
-    worker = new Worker('js/maia-worker.js?v=37');
+    worker = new Worker('js/maia-worker.js?v=48');
     worker.onmessage = (e) => {
       const msg = e.data || {};
       if (msg.type === 'ready') {
@@ -70,13 +96,16 @@ const MaiaEngine = (() => {
           pending.get(msg.id).reject(new Error(msg.message));
           pending.delete(msg.id);
         } else {
+          // No id means the failure was in loading, not one request, so the
+          // model is not coming: give up instead of polling until the timeout.
           console.warn('Maia:', msg.message);
+          failAll(msg.message || 'Maia failed to load');
         }
       }
     };
     worker.onerror = (e) => {
       console.warn('Maia worker failed:', e.message || e);
-      disabled = true;
+      failAll('Maia worker crashed');
     };
   }
 
@@ -88,6 +117,11 @@ const MaiaEngine = (() => {
     if (disabled) return Promise.resolve(false);
     if (ready) return Promise.resolve(true);
     if (readyPromise) return readyPromise;
+    if (!deviceCanCope()) {
+      console.info('Maia skipped: device reports too little memory for a 44 MB model.');
+      disabled = true;
+      return Promise.resolve(false);
+    }
 
     onProgress = progressFn || null;
     readyPromise = (async () => {
@@ -95,7 +129,10 @@ const MaiaEngine = (() => {
         await loadTables();
         if (!worker) spawn();
         await new Promise((resolve, reject) => {
-          const timer = setTimeout(() => reject(new Error('timed out loading Maia')), 180000);
+          const timer = setTimeout(
+            () => reject(new Error('timed out loading Maia')),
+            LOAD_TIMEOUT_MS
+          );
           const check = setInterval(() => {
             if (ready) {
               clearInterval(check);
@@ -126,7 +163,20 @@ const MaiaEngine = (() => {
   function infer(tokens, eloSelf, eloOppo) {
     return new Promise((resolve, reject) => {
       const id = nextId++;
-      pending.set(id, { resolve, reject });
+      // Without this timeout a worker that dies mid-inference (out of memory on
+      // a phone, most likely) leaves this promise unsettled forever, and the
+      // game simply stops — no error, no move, nothing to click.
+      const timer = setTimeout(() => {
+        if (pending.delete(id)) {
+          failAll('Maia inference timed out');
+          reject(new Error('Maia inference timed out'));
+        }
+      }, INFER_TIMEOUT_MS);
+      const settle = (fn) => (value) => {
+        clearTimeout(timer);
+        fn(value);
+      };
+      pending.set(id, { resolve: settle(resolve), reject: settle(reject) });
       const buf = tokens.buffer;
       worker.postMessage({ type: 'infer', id, tokens: buf, eloSelf, eloOppo }, [buf]);
     });

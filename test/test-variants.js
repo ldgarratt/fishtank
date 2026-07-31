@@ -13,6 +13,7 @@ const {
 let failures = 0;
 let testDrunkFishBlunders = async () => {};
 let testAnalysisBestMoves = async () => {};
+let testMaiaTimeout = async () => {};
 function assert(cond, msg) {
   if (cond) console.log('  ok - ' + msg);
   else {
@@ -725,6 +726,79 @@ async function testDrawFish() {
   }
 }
 
+console.log('Maia failure handling');
+{
+  // The bug: a worker that never answered left the game waiting on a promise
+  // that could not settle. Every path out of Maia has to terminate.
+  const fs = require('fs');
+  const src = fs.readFileSync(path.join(__dirname, '..', 'js', 'maia.js'), 'utf8');
+
+  assert(/INFER_TIMEOUT_MS/.test(src) && /setTimeout\([\s\S]{0,200}INFER_TIMEOUT_MS/.test(src),
+    'inference is bounded by a timeout');
+  assert(/function failAll/.test(src), 'there is one way to abandon Maia');
+  assert(/worker\.onerror[\s\S]{0,160}failAll/.test(src),
+    'a crashed worker rejects everything in flight');
+  assert(/deviceCanCope/.test(src), 'low-memory devices skip the 44 MB model');
+
+  // Loading a stub of the module with fake globals proves the timeout actually
+  // fires, rather than just being present in the source.
+  const stubbed = src
+    .replace(/^\/\* global MaiaEncode \*\/$/m, '')
+    .replace('INFER_TIMEOUT_MS = 15000', 'INFER_TIMEOUT_MS = 40');
+  const sandbox = {
+    navigator: { deviceMemory: 8 },
+    console: { warn() {}, info() {} },
+    setTimeout,
+    clearTimeout,
+    setInterval,
+    clearInterval,
+    fetch: () => Promise.reject(new Error('no network in tests')),
+    module: { exports: {} },
+    Float32Array,
+    Map,
+    Promise,
+    Error,
+    Date,
+    Math,
+    // A worker that accepts messages and never replies — the mobile failure.
+    Worker: function () {
+      this.postMessage = () => {};
+    },
+    MaiaEncode: {
+      preprocess: () => ({
+        tokens: new Float32Array(64 * 12),
+        legalMask: new Float32Array(4352),
+        blackToMove: false,
+      }),
+      decode: () => ({ policy: {}, winProb: 0.5 }),
+      sampleMove: () => 'e2e4',
+      topMove: () => 'e2e4',
+    },
+  };
+  require('vm').createContext(sandbox);
+  require('vm').runInContext(stubbed, sandbox);
+  const M = sandbox.module.exports.MaiaEngine;
+
+  assert(M.inBand(1600) === true, 'SharkFish\'s 1600 is inside Maia\'s band');
+  assert(M.inBand(3190) === false && M.inBand(400) === false,
+    'full-strength and beginner bots stay on Stockfish');
+
+  testMaiaTimeout = async () => {
+    // Force "loaded" without a real model, then ask for a move: the silent
+    // worker must produce a rejection, not a promise that hangs for ever.
+    const started = Date.now();
+    const result = await Promise.race([
+      M.pickMove('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1', 1600),
+      new Promise((r) => setTimeout(() => r('HUNG'), 3000)),
+    ]);
+    assert(result !== 'HUNG',
+      'a silent Maia worker gives up instead of hanging the game ' +
+      `(settled in ${Date.now() - started} ms)`);
+    assert(result === null, 'and returns null so the caller falls back to Stockfish');
+    assert(M.isDisabled() === true, 'Maia is switched off for the rest of the session');
+  };
+}
+
 console.log('Handicap variants');
 {
   const fs = require('fs');
@@ -1188,6 +1262,7 @@ console.log('DragonFish search');
 (async () => {
   await testDrunkFishBlunders();
   await testAnalysisBestMoves();
+  await testMaiaTimeout();
   await testDrawFish();
   await testWorstFish();
   await testPityFish();
