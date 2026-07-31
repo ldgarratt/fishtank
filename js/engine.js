@@ -33,9 +33,9 @@
 // bots answer instantly and strong ones stall. Strength below the engine's
 // Elo floor comes from Skill Level noise instead (which is how Stockfish's own
 // Skill Level works — it searches normally and simply chooses badly).
-const MOVETIME_MS = 1200; // normal play
-const RANK_MOVETIME_MS = 1200; // ranking every legal move (DrawFish, WorstFish)
-const JUDGE_MOVETIME_MS = 800; // ranking to judge the player's move (PityFish)
+const MOVETIME_MS = 800; // normal play
+const RANK_MOVETIME_MS = 800; // ranking every legal move (DrawFish, WorstFish)
+const JUDGE_MOVETIME_MS = 550; // ranking to judge the player's move (PityFish)
 
 const SKILL_ANCHORS = [
   [100, -20],

@@ -535,7 +535,7 @@
   // Always give the limiter full thinking time: UCI_Elo's calibration assumes
   // it, and our single-threaded WASM build is already ~10x slower than native.
   // Starving it makes nominal ratings play far below par.
-  const MOVETIME_MS = 1200;
+  const MOVETIME_MS = 800;
 
   function checkGameEnd() {
     // Variant-specific win conditions (e.g. three-check) take precedence.
