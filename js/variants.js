@@ -413,7 +413,8 @@ const VARIANTS = {
       'to convert it.',
     baseElo: ELO_MAX,
     demo: [['♗d3', '3190', ''], ['♔e2', '3190', ''], ['♕—', 'odds', '']],
-    art: { props: [['crown', 62, 34, 30, -12], ['whiteFlag', 34, 74, 24, 14]] },
+    // The piece it does without, struck through.
+    art: { props: [['pieceQueen', 62, 40, 28, -8], ['noSign', 62, 40, 44, 0]] },
     startFen: oddsFen('q'),
   },
 
@@ -427,7 +428,8 @@ const VARIANTS = {
       "queen's rook, and without the castling rights on that side.",
     baseElo: ELO_MAX,
     demo: [['♗d3', '3190', ''], ['♔e2', '3190', ''], ['♖—', 'odds', '']],
-    art: { props: [['shield', 64, 36, 30, -8], ['whiteFlag', 34, 74, 22, 14]] },
+    // The piece it does without, struck through.
+    art: { props: [['pieceRook', 62, 40, 28, -8], ['noSign', 62, 40, 44, 0]] },
     startFen: oddsFen('r'),
   },
 
@@ -441,7 +443,8 @@ const VARIANTS = {
       "queen's knight. The smallest of the odds — about three points.",
     baseElo: ELO_MAX,
     demo: [['♗d3', '3190', ''], ['♔e2', '3190', ''], ['♘—', 'odds', '']],
-    art: { props: [['dunceCap', 44, 40, 26, -14], ['whiteFlag', 32, 76, 22, 14]] },
+    // The piece it does without, struck through.
+    art: { props: [['pieceKnight', 62, 40, 28, -8], ['noSign', 62, 40, 44, 0]] },
     startFen: oddsFen('n'),
   },
 
@@ -455,7 +458,8 @@ const VARIANTS = {
       "queen's bishop, leaving it with one bishop and half the board.",
     baseElo: ELO_MAX,
     demo: [['♗d3', '3190', ''], ['♔e2', '3190', ''], ['♗—', 'odds', '']],
-    art: { props: [['halo', 52, 30, 40, 0], ['whiteFlag', 32, 76, 22, 14]] },
+    // The piece it does without, struck through.
+    art: { props: [['pieceBishop', 62, 40, 28, -8], ['noSign', 62, 40, 44, 0]] },
     startFen: oddsFen('b'),
   },
 
@@ -538,7 +542,8 @@ const VARIANTS = {
       'is the built-in search.',
     baseElo: null,
     demo: [['🏰b3', '♖+♘', ''], ['🦅c4', '♗+♘', ''], ['♘g1', 'plain', '']],
-    art: { filter: 'saturate(1.25)', props: [['shield', 68, 40, 32, 8], ['crown', 36, 74, 24, -16], ['checkMarks', 88, 62, 12, 0]] },
+    // Rook + knight: the chancellor you get and the engine does not.
+    art: { props: [['pieceRook', 50, 30, 24, -6], ['plusBadge', 64, 41, 13, 0], ['pieceKnight', 78, 52, 24, 6]] },
     fairySpec: {
       variantName: 'army',
       glyphs: { c: '🏰', a: '🦅' },
@@ -571,7 +576,8 @@ const VARIANTS = {
       'Fairy-Stockfish. Beta — the opponent is the built-in search.',
     baseElo: null,
     demo: [['🐲d5', '♕+♘', ''], ['🐲xf7+', 'fork', ''], ['♕d8', 'plain', '']],
-    art: { filter: 'hue-rotate(15deg) saturate(1.2)', props: [['dragonWing', 68, 38, 34, -10], ['crown', 38, 74, 26, -18]] },
+    // Queen + knight: your dragon, spelled out.
+    art: { props: [['pieceQueen', 50, 30, 24, -6], ['plusBadge', 64, 41, 13, 0], ['pieceKnight', 78, 52, 24, 6]] },
     fairySpec: {
       variantName: 'handicap',
       glyphs: { a: '🐲' },

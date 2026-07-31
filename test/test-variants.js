@@ -923,6 +923,58 @@ console.log('Handicap variants');
   }
 }
 
+console.log('Card art');
+{
+  const { FishArt } = require(path.join(__dirname, '..', 'js', 'fish-art.js'));
+  const known = new Set(Object.keys(FishArt.PROPS));
+
+  const missing = [];
+  for (const [id, v] of Object.entries(VARIANTS)) {
+    for (const entry of (v.art && v.art.props) || []) {
+      const [name, x, y, size] = entry;
+      if (!known.has(name)) missing.push(`${id}:${name}`);
+      if (![x, y, size].every((n) => typeof n === 'number' && n >= 0 && n <= 100)) {
+        missing.push(`${id}:${name} has an out-of-range coordinate`);
+      }
+    }
+  }
+  assert(missing.length === 0,
+    'every card references a prop that exists, in range' +
+    (missing.length ? ' (' + missing.join(', ') + ')' : ''));
+
+  // Each prop must be renderable SVG, not a broken template string.
+  for (const [name, draw] of Object.entries(FishArt.PROPS)) {
+    const out = draw();
+    if (!/^<svg[^>]*viewBox="[\d.\- ]+"/.test(out) || !out.endsWith('</svg>')) {
+      assert(false, `prop "${name}" produces a well-formed svg`);
+    }
+  }
+  assert(true, 'every prop produces a well-formed svg');
+
+  // The odds bots say what is missing; the upgrade bots say what you gain.
+  const ODDS_ART = {
+    queenlessfish: 'pieceQueen',
+    rooklessfish: 'pieceRook',
+    knightlessfish: 'pieceKnight',
+    bishoplessfish: 'pieceBishop',
+  };
+  for (const [id, piece] of Object.entries(ODDS_ART)) {
+    const names = VARIANTS[id].art.props.map((p) => p[0]);
+    assert(names.includes(piece) && names.includes('noSign'),
+      `${VARIANTS[id].name} shows the piece it lacks, struck through`);
+    // The slash has to be drawn over the piece, i.e. same spot and bigger.
+    const [, px, py, psize] = VARIANTS[id].art.props.find((p) => p[0] === piece);
+    const [, nx, ny, nsize] = VARIANTS[id].art.props.find((p) => p[0] === 'noSign');
+    assert(px === nx && py === ny, `${VARIANTS[id].name} centres the sign on the piece`);
+    assert(nsize > psize, `${VARIANTS[id].name} draws the sign larger than the piece`);
+  }
+  for (const id of ['armyfish', 'handicapfish']) {
+    const names = VARIANTS[id].art.props.map((p) => p[0]);
+    assert(names.includes('plusBadge') && names.filter((n) => n.startsWith('piece')).length === 2,
+      `${VARIANTS[id].name} shows the two pieces its fairy piece combines`);
+  }
+}
+
 console.log('Variant ordering');
 {
   const fs = require('fs');

@@ -69,7 +69,7 @@ const MaiaEngine = (() => {
   }
 
   function spawn() {
-    worker = new Worker('js/maia-worker.js?v=50');
+    worker = new Worker('js/maia-worker.js?v=51');
     worker.onmessage = (e) => {
       const msg = e.data || {};
       if (msg.type === 'ready') {

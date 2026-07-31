@@ -324,6 +324,76 @@ const FishArt = (() => {
          <path d="M30 24c4-16 16-20 22-6-8-2-14 2-16 8z" fill="#ffffff"/>
          <path d="M36 22c6-12 14-10 16-2z" fill="#eceff1"/>`
       ),
+
+    /*
+     * Chess-piece silhouettes, for the bots defined by which piece is present
+     * or missing rather than by a mood. Paired with `noSign` they read as
+     * "no queen"; paired with `plusBadge` they read as "rook plus knight".
+     */
+    pieceQueen: () =>
+      svg(
+        '0 0 60 84',
+        `<g fill="#fafafa" stroke="#263238" stroke-width="3" stroke-linejoin="round">
+           <path d="M10 78h40v-8H10z"/>
+           <path d="M16 70c0-11 2-17 4-23h20c2 6 4 12 4 23z"/>
+           <path d="M14 47l-5-25 13 11 8-18 8 18 13-11-5 25z"/>
+         </g>
+         <g fill="#263238">
+           <circle cx="9" cy="20" r="4"/><circle cx="30" cy="12" r="4"/><circle cx="51" cy="20" r="4"/>
+         </g>`
+      ),
+
+    pieceRook: () =>
+      svg(
+        '0 0 60 84',
+        `<g fill="#fafafa" stroke="#263238" stroke-width="3" stroke-linejoin="round">
+           <path d="M10 78h40v-8H10z"/>
+           <path d="M16 70V38h28v32z"/>
+           <path d="M13 38V18h9v8h5v-8h6v8h5v-8h9v20z"/>
+         </g>`
+      ),
+
+    pieceBishop: () =>
+      svg(
+        '0 0 60 84',
+        `<g fill="#fafafa" stroke="#263238" stroke-width="3" stroke-linejoin="round">
+           <path d="M10 78h40v-8H10z"/>
+           <path d="M18 70c0-9 4-11 4-17h16c0 6 4 8 4 17z"/>
+           <path d="M30 16c9 9 13 17 13 23a13 13 0 01-26 0c0-6 4-14 13-23z"/>
+           <circle cx="30" cy="11" r="5"/>
+         </g>
+         <path d="M30 30v14M23 37h14" stroke="#263238" stroke-width="3" stroke-linecap="round"/>`
+      ),
+
+    // Horse head facing left: muzzle, two ears, mane down the back.
+    pieceKnight: () =>
+      svg(
+        '0 0 60 84',
+        `<g fill="#fafafa" stroke="#263238" stroke-width="3" stroke-linejoin="round">
+           <path d="M10 78h40v-8H10z"/>
+           <path d="M18 70C18 58 18 52 20 48L10 44C9 40 12 36 16 33
+                    C20 30 22 26 24 21L26 9L33 18L38 7
+                    C44 16 46 26 46 38C46 52 44 62 44 70Z"/>
+         </g>
+         <circle cx="33" cy="27" r="2.6" fill="#263238"/>
+         <path d="M14 42h7" stroke="#263238" stroke-width="2.5" stroke-linecap="round"/>`
+      ),
+
+    // Red circle-and-slash, drawn over a piece to mean "starts without this".
+    noSign: () =>
+      svg(
+        '0 0 100 100',
+        `<circle cx="50" cy="50" r="41" fill="none" stroke="#e53935" stroke-width="11"/>
+         <path d="M21 79L79 21" stroke="#e53935" stroke-width="11" stroke-linecap="round"/>`
+      ),
+
+    // Sits between two piece silhouettes: "this one moves like both".
+    plusBadge: () =>
+      svg(
+        '0 0 44 44',
+        `<circle cx="22" cy="22" r="20" fill="#ffca28" stroke="#f57f17" stroke-width="3"/>
+         <path d="M22 11v22M11 22h22" stroke="#6d4c41" stroke-width="6" stroke-linecap="round"/>`
+      ),
   };
 
   /**
