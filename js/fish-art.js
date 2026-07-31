@@ -12,7 +12,7 @@
 const FishArt = (() => {
   // The fish's head sits at roughly this point of the Stockfish photo; the
   // zoom is anchored here so props can be placed against a fixed landmark.
-  const HEAD_ORIGIN = '30% 75%';
+  const HEAD_ORIGIN = '47% 85%';
   const svg = (vb, body, extra = '') =>
     `<svg viewBox="${vb}" xmlns="http://www.w3.org/2000/svg" ${extra}>${body}</svg>`;
 
@@ -133,9 +133,10 @@ const FishArt = (() => {
 
     angerVeins: () =>
       svg(
-        '0 0 60 60',
-        `<g stroke="#e53935" stroke-width="7" stroke-linecap="round" fill="none">
-           <path d="M10 22L30 6l20 16M10 24L30 40l20-16"/>
+        '0 0 64 64',
+        `<g stroke="#e53935" stroke-width="8" stroke-linecap="round" fill="none">
+           <path d="M6 18L20 32 6 46"/><path d="M32 6l0 20"/>
+           <path d="M58 18L44 32l14 14"/><path d="M32 58l0-20"/>
          </g>`
       ),
 
@@ -327,7 +328,7 @@ const FishArt = (() => {
     // Zoom about the fish's head (~30%,75% of the photo) so that point stays
     // put and prop coordinates below are stable.
     const fishStyle =
-      `transform-origin:${HEAD_ORIGIN};transform:${art.transform || 'scale(1.45)'};` +
+      `transform-origin:${HEAD_ORIGIN};transform:${art.transform || 'scale(1.3)'};` +
       `filter:${art.filter || 'none'}`;
     const props = (art.props || [])
       .map(([name, x, y, size, rot = 0]) => {
@@ -372,7 +373,7 @@ const FishArt = (() => {
     // Zoom about the fish's head (~30%,75% of the photo) so that point stays
     // put and prop coordinates below are stable.
     const fishStyle =
-      `transform-origin:${HEAD_ORIGIN};transform:${art.transform || 'scale(1.45)'};` +
+      `transform-origin:${HEAD_ORIGIN};transform:${art.transform || 'scale(1.3)'};` +
       `filter:${art.filter || 'none'}`;
     const props = (art.props || [])
       .map(([name, x, y, size, rot = 0]) => {
