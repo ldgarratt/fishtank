@@ -50,6 +50,9 @@
   let gameOver = false;
   let premove = null; // { from, to } queued while the engine thinks
   let pendingPromo = null; // { from, to } awaiting promotion piece choice
+  let reviewPly = null; // null = live position; otherwise plies shown
+  let reviewGame = null; // chess.js replay used while reviewing
+  let liveStatus = ''; // status text to restore when leaving review
 
   /* ---------- variant picker ---------- */
 
@@ -124,6 +127,8 @@
     gameOver = false;
     premove = null;
     pendingPromo = null;
+    reviewPly = null;
+    reviewGame = null;
     document.getElementById('promo').classList.add('hidden');
 
     els.picker.classList.add('hidden');
@@ -174,14 +179,16 @@
 
   function renderBoard() {
     els.board.innerHTML = '';
+    // While reviewing, the board shows a past position instead of the live one.
+    const view = reviewPly === null ? game : reviewGame;
     const flipped = playerColor === 'b';
     const legalTargets = new Set();
-    if (selectedSquare) {
+    if (selectedSquare && reviewPly === null) {
       for (const m of game.moves({ square: selectedSquare, verbose: true })) {
         legalTargets.add(m.to);
       }
     }
-    const lastMove = game.history({ verbose: true }).slice(-1)[0] || null;
+    const lastMove = view.history({ verbose: true }).slice(-1)[0] || null;
 
     for (let r = 0; r < 8; r++) {
       for (let f = 0; f < 8; f++) {
@@ -191,7 +198,7 @@
         const cell = document.createElement('div');
         cell.className = 'sq ' + (((rr + ff) % 2 === 0) ? 'light' : 'dark');
         cell.dataset.sq = sq;
-        const piece = game.get(sq);
+        const piece = view.get(sq);
         cell.setAttribute('role', 'gridcell');
         cell.setAttribute('aria-label', sq + (piece ? ', ' + pieceLabel(piece) : ', empty'));
         if (piece) {
@@ -207,7 +214,7 @@
           };
           cell.appendChild(img);
           if (piece.type === 'k' && variant && variant.kingLives) {
-            const lives = variant.kingLives(vstate, game)[piece.color];
+            const lives = variant.kingLives(vstate, view)[piece.color];
             const badge = document.createElement('span');
             badge.className = 'king-lives' + (lives <= 1 ? ' king-lives-low' : '');
             badge.textContent = lives;
@@ -218,11 +225,11 @@
         if (premove && (premove.from === sq || premove.to === sq)) cell.classList.add('premove');
         if (legalTargets.has(sq)) cell.classList.add(piece ? 'capture-target' : 'move-target');
         if (lastMove && (lastMove.from === sq || lastMove.to === sq)) cell.classList.add('last-move');
-        if (piece && piece.type === 'k' && game.in_check() && piece.color === game.turn()) {
+        if (piece && piece.type === 'k' && view.in_check() && piece.color === view.turn()) {
           cell.classList.add('in-check');
         }
         cell.addEventListener('click', () => onSquareClick(sq));
-        if (piece && piece.color === playerColor) {
+        if (piece && piece.color === playerColor && reviewPly === null) {
           cell.addEventListener('pointerdown', (e) => startDrag(e, sq, cell));
         }
         els.board.appendChild(cell);
@@ -233,6 +240,10 @@
   /* ---------- interaction ---------- */
 
   function onSquareClick(sq) {
+    if (reviewPly !== null) {
+      goToPly(null); // any click on the board jumps back to the live position
+      return;
+    }
     if (gameOver || !game || pendingPromo) return;
     const piece = game.get(sq);
 
@@ -290,7 +301,7 @@
   /* ---------- drag and drop ---------- */
 
   function startDrag(e, sq, cell) {
-    if (gameOver || pendingPromo || !game) return;
+    if (gameOver || pendingPromo || !game || reviewPly !== null) return;
     if (e.button !== undefined && e.button !== 0) return;
     e.preventDefault();
 
@@ -402,6 +413,9 @@
   /* ---------- game loop ---------- */
 
   async function afterPlayerMove(move, fenBefore, legalCount) {
+    reviewPly = null; // a new move always snaps back to the live position
+    reviewGame = null;
+    els.board.classList.remove('reviewing');
     renderBoard();
     sound.play(move.captured ? 'capture' : 'move');
     if (game.in_check()) sound.play('check');
@@ -750,9 +764,65 @@
     gameOver = false;
     selectedSquare = null;
     premove = null;
+    reviewPly = null;
+    reviewGame = null;
     logEvent('↩️ Move taken back (Elo effects are not refunded).');
     renderBoard();
     setStatus('Your move.');
+  }
+
+  /* ---------- move navigation (arrow keys, lichess style) ---------- */
+
+  function positionAt(ply) {
+    const replay = new Chess();
+    const history = game.history();
+    for (let i = 0; i < ply; i++) replay.move(history[i]);
+    return replay;
+  }
+
+  /** ply === null returns to the live position. */
+  function goToPly(ply) {
+    if (!game) return;
+    const total = game.history().length;
+    if (ply === null || ply >= total) {
+      reviewPly = null;
+      reviewGame = null;
+      renderBoard();
+      els.board.classList.remove('reviewing');
+      setStatus(liveStatus);
+      return;
+    }
+    reviewPly = Math.max(0, ply);
+    reviewGame = positionAt(reviewPly);
+    selectedSquare = null;
+    renderBoard();
+    els.board.classList.add('reviewing');
+    els.status.textContent =
+      `⏪ Move ${reviewPly} of ${total} — press → for the live position`;
+  }
+
+  function stepReview(delta) {
+    if (!game) return;
+    const total = game.history().length;
+    if (!total) return;
+    const current = reviewPly === null ? total : reviewPly;
+    goToPly(Math.min(total, Math.max(0, current + delta)));
+  }
+
+  function onKeyDown(e) {
+    if (els.game.classList.contains('hidden')) return; // picker is showing
+    if (!game) return; // fairy mode keeps its own board
+    const tag = (e.target.tagName || '').toLowerCase();
+    if (tag === 'input' || tag === 'select' || tag === 'textarea') return;
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    switch (e.key) {
+      case 'ArrowLeft': stepReview(-1); break;
+      case 'ArrowRight': stepReview(1); break;
+      case 'ArrowUp': case 'Home': goToPly(0); break;
+      case 'ArrowDown': case 'End': goToPly(null); break;
+      default: return;
+    }
+    e.preventDefault();
   }
 
   /* ---------- UI helpers ---------- */
@@ -784,7 +854,8 @@
   }
 
   function setStatus(text) {
-    els.status.textContent = text;
+    liveStatus = text;
+    if (reviewPly === null) els.status.textContent = text;
   }
 
 
@@ -809,6 +880,7 @@
       e.preventDefault();
       goToPicker();
     });
+    document.addEventListener('keydown', onKeyDown);
     els.btnPgn.addEventListener('click', copyPgn);
     els.btnAnalyse.addEventListener('click', analyseGame);
     window.addEventListener('popstate', applyLocation);

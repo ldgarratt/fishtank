@@ -46,6 +46,13 @@ doesn't stream from a CDN:
 bash engine/get-engine.sh
 ```
 
+## Reviewing a game
+
+Arrow keys step through the moves, as on lichess: **←** back a move, **→**
+forward, **↑** jump to the start, **↓** back to the live position. The board
+dims while you're looking at an earlier position, and clicking it (or making
+a move) returns to the present.
+
 ## After the game
 
 - **Copy PGN** — puts the full game on your clipboard with headers, ready to
