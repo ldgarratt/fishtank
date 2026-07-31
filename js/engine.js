@@ -12,32 +12,33 @@
  */
 
 /*
- * Weak-play model.
+ * Strength model: bounded evaluation loss.
  *
- * Above 1320 Stockfish's own UCI_Elo limiter is calibrated and used directly.
- * Below it, strength comes from Skill Level noise over a normal time-limited
- * search: the engine looks at the position properly, then picks among several
- * candidate moves after adding score noise that grows as skill drops. This is
- * how Stockfish's own Skill Level works — it never touches search depth.
+ * Stockfish's own UCI_Elo is not usable here. Internally it converts the
+ * rating to a Skill Level (UCI_Elo 2000 -> Skill 4 of 20) and weakens play by
+ * *sometimes choosing a much worse move* from a short candidate list. That
+ * produces strong positional play punctuated by hanging a piece, which is not
+ * what a 2000-rated human looks like, and its scale is calibrated against
+ * engine opponents rather than human ratings.
  *
- * Classical Stockfish only accepts Skill Level 0-20; lichess gets negative
- * levels by running Fairy-Stockfish. We keep the stock engine and reproduce
- * its Skill::pick_best() formula in JS over a MultiPV list, which lets the
- * level go continuously negative.
+ * Instead every rated bot searches at full strength with MultiPV and then
+ * plays a move drawn from those whose evaluation is within a rating-dependent
+ * allowance of the best move. The allowance is the whole model:
  *
- * Elo -> Skill Level anchors come from lichess's published level calibration
- * (level 1 skill -9 ~ <400, level 2 skill -5 ~ 500, level 3 skill -1 ~ 800,
- * level 4 skill 3 ~ 1100, level 5 skill 7 ~ 1500).
+ *   3190 -> 0 cp    (always the best move)
+ *   2400 -> 45 cp   (small inaccuracies only)
+ *   2000 -> 80 cp   (never worse than a pawn-ish slip; cannot hang a piece)
+ *   1200 -> 200 cp
+ *    400 -> 450 cp  (routinely drops material, like a beginner)
+ *
+ * Weaker moves inside the allowance are chosen more often as the rating drops,
+ * so play degrades smoothly instead of switching between perfect and awful.
  */
-// Every search is time-limited, never depth-limited: fixed depth makes weak
-// bots answer instantly and strong ones stall. Strength below the engine's
-// Elo floor comes from Skill Level noise instead (which is how Stockfish's own
-// Skill Level works — it searches normally and simply chooses badly).
+
 /**
- * Think time by requested rating. Stockfish's UCI_Elo calibration assumes a
- * full-strength base engine; a single-threaded WASM build needs more time to
- * reach the level it is being asked to play at. Weak settings don't need it,
- * so the pace only slows where accuracy actually depends on it.
+ * Think time by rating. A stronger bot needs a deeper search for its narrow
+ * allowance to be meaningful; a weak one does not, so the pace only slows
+ * where it matters.
  */
 function movetimeForElo(elo) {
   if (!elo || elo < 1600) return 600;
@@ -46,60 +47,67 @@ function movetimeForElo(elo) {
   return 2000;
 }
 
-const MOVETIME_MS = 800; // fallback when no rating applies (fairy/DragonFish)
+const MOVETIME_MS = 800; // used when no rating applies (fairy/DragonFish)
 const RANK_MOVETIME_MS = 800; // ranking every legal move (DrawFish, WorstFish)
 const JUDGE_MOVETIME_MS = 550; // ranking to judge the player's move (PityFish)
 
-const SKILL_ANCHORS = [
-  [100, -20],
-  [300, -11],
-  [400, -9],
-  [500, -5],
-  [800, -1],
-  [1100, 3],
-  [1500, 7],
+// [elo, maximum centipawn loss tolerated]
+const LOSS_ANCHORS = [
+  [100, 700],
+  [400, 450],
+  [800, 300],
+  [1200, 200],
+  [1600, 130],
+  [2000, 80],
+  [2400, 45],
+  [2800, 20],
+  [3190, 0],
 ];
 
-/** Continuous Elo -> Stockfish Skill Level (may be negative). */
-function skillForElo(elo) {
-  if (elo <= SKILL_ANCHORS[0][0]) return SKILL_ANCHORS[0][1];
-  const last = SKILL_ANCHORS[SKILL_ANCHORS.length - 1];
+/** How much evaluation a bot at this rating is willing to throw away. */
+function maxLossForElo(elo) {
+  if (elo <= LOSS_ANCHORS[0][0]) return LOSS_ANCHORS[0][1];
+  const last = LOSS_ANCHORS[LOSS_ANCHORS.length - 1];
   if (elo >= last[0]) return last[1];
-  for (let i = 1; i < SKILL_ANCHORS.length; i++) {
-    const [e1, s1] = SKILL_ANCHORS[i - 1];
-    const [e2, s2] = SKILL_ANCHORS[i];
-    if (elo <= e2) return s1 + ((elo - e1) / (e2 - e1)) * (s2 - s1);
+  for (let i = 1; i < LOSS_ANCHORS.length; i++) {
+    const [e1, l1] = LOSS_ANCHORS[i - 1];
+    const [e2, l2] = LOSS_ANCHORS[i];
+    if (elo <= e2) return l1 + ((elo - e1) / (e2 - e1)) * (l2 - l1);
   }
   return last[1];
 }
 
-/** How many candidate moves to consider. Weaker play needs a wider net. */
-function multipvForSkill(skill) {
-  return skill >= 0 ? 4 : Math.min(12, 4 + Math.round(-skill / 2));
+/** Candidate moves to examine; weaker bots need a wider net to pick from. */
+function multipvForElo(elo) {
+  if (elo >= 2800) return 3;
+  if (elo >= 2000) return 5;
+  return 8;
 }
 
 /**
- * Stockfish's Skill::pick_best() formula, generalised to negative levels.
- * `ranked` is [{ move, score }] sorted best-first, scores from the mover's
- * perspective. Weaker levels add a larger deterministic *and* random bonus to
- * worse moves, so they routinely win the comparison.
+ * Choose among ranked moves ([{move, score}], best first) given a rating.
+ * Only moves within the rating's allowance are eligible, and better moves are
+ * weighted more heavily so the bot is not uniformly sloppy.
  */
-function pickWithSkillNoise(ranked, skill, rng = Math.random) {
+function chooseWithinLoss(ranked, elo, rng = Math.random) {
   if (!ranked || !ranked.length) return null;
-  const weakness = 120 - 2 * skill;
+  const cap = maxLossForElo(elo);
   const top = ranked[0].score;
-  const delta = Math.min(top - ranked[ranked.length - 1].score, 200);
-  let best = ranked[0];
-  let maxScore = -Infinity;
-  for (const r of ranked) {
-    const push = (weakness * (top - r.score) + delta * (rng() * weakness)) / 128;
-    const adjusted = r.score + push;
-    if (adjusted >= maxScore) {
-      maxScore = adjusted;
-      best = r;
-    }
+  const eligible = ranked.filter((r) => top - r.score <= cap);
+  if (eligible.length <= 1) return ranked[0].move;
+
+  // Weight: a move that loses nothing is most likely; one at the cap is least.
+  const weights = eligible.map((r) => {
+    const loss = top - r.score;
+    return Math.pow(1 - loss / (cap + 1), 2) + 0.05;
+  });
+  const total = weights.reduce((a, b) => a + b, 0);
+  let pick = rng() * total;
+  for (let i = 0; i < eligible.length; i++) {
+    pick -= weights[i];
+    if (pick <= 0) return eligible[i].move;
   }
-  return best.move;
+  return eligible[eligible.length - 1].move;
 }
 
 const ENGINE_SOURCES = [
@@ -135,7 +143,7 @@ class SillyEngine {
     this.sourceName = null;
     this.listeners = [];
     this.lastElo = null;
-    this.emulatedSkill = null;
+    this.targetElo = null;
     this.eloRange = null; // filled from the engine's own option list
     this.hasSkill = false;
   }
@@ -269,47 +277,22 @@ class SillyEngine {
   }
 
   /**
-   * Map an effective Elo to engine settings.
-   *  - 1320..3190: Stockfish's own calibrated limiter.
-   *  - below 1320:  a low/negative Skill Level over a normal timed search.
-   *                 Non-negative skill is handled natively by the engine;
-   *                 negative skill is emulated in JS over MultiPV candidates
-   *                 (see pickWithSkillNoise).
+   * Record the rating to play at. The engine itself always searches at full
+   * strength; the rating is applied when choosing among the candidate moves.
    */
   setStrength(effectiveElo) {
     const elo = Math.round(effectiveElo);
+    this.targetElo = elo;
     if (elo === this.lastElo) return;
     this.lastElo = elo;
-
-    // Use the limiter only where this build actually supports it.
-    const range = this.eloRange;
-    if (range && elo >= range.min) {
-      this.emulatedSkill = null;
-      this.send('setoption name MultiPV value 1');
-      this.send('setoption name Skill Level value 20');
-      this.send('setoption name UCI_LimitStrength value true');
-      this.send('setoption name UCI_Elo value ' + Math.min(range.max, elo));
-      return;
-    }
-
-    const skill = skillForElo(elo);
     this.send('setoption name UCI_LimitStrength value false');
-    if (skill >= 0) {
-      // Stock engine can do this itself.
-      this.emulatedSkill = null;
-      this.send('setoption name MultiPV value 1');
-      this.send('setoption name Skill Level value ' + Math.round(skill));
-    } else {
-      // Below skill 0: search honestly, then choose badly on purpose.
-      this.emulatedSkill = skill;
-      this.send('setoption name Skill Level value 20');
-    }
+    this.send('setoption name Skill Level value 20');
   }
 
   /** Full strength, no limiter — used for post-game analysis. */
   setFullStrength() {
     this.lastElo = null; // force reconfiguration for the next game
-    this.emulatedSkill = null;
+    this.targetElo = null;
     this.send('setoption name UCI_LimitStrength value false');
     this.send('setoption name Skill Level value 20');
   }
@@ -413,15 +396,16 @@ class SillyEngine {
     return { worst: ranked[ranked.length - 1].move, ranked: ranked.length };
   }
 
-  /** Ask for the best move from a FEN. Resolves with a UCI move string like "e2e4" or "e7e8q". */
+  /**
+   * Ask for a move at the current rating: search with MultiPV, then pick from
+   * the candidates that are within this rating's evaluation allowance.
+   */
   async bestMove(fen, movetimeMs) {
-    // Emulated negative skill: rank candidates at normal depth, then apply
-    // Stockfish's own skill-noise formula to choose among them.
-    if (this.emulatedSkill !== null && this.emulatedSkill < 0) {
-      const skill = this.emulatedSkill;
-      const ranked = await this._rankFrom(fen, multipvForSkill(skill), movetimeMs);
+    const elo = this.targetElo;
+    if (elo != null && maxLossForElo(elo) > 0) {
+      const ranked = await this._rankFrom(fen, multipvForElo(elo), movetimeMs);
       if (ranked && ranked.length) {
-        const chosen = pickWithSkillNoise(ranked, skill);
+        const chosen = chooseWithinLoss(ranked, elo);
         if (chosen) return chosen;
       }
       // Ranking unavailable — fall through to a plain search.
@@ -448,9 +432,9 @@ if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     SillyEngine,
     ENGINE_SOURCES,
-    skillForElo,
-    multipvForSkill,
-    pickWithSkillNoise,
+    maxLossForElo,
+    multipvForElo,
+    chooseWithinLoss,
     movetimeForElo,
     MOVETIME_MS,
     RANK_MOVETIME_MS,

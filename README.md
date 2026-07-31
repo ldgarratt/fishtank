@@ -65,64 +65,55 @@ a move) returns to the present.
 
 ## How the strength adjustment works
 
-Each bot tracks an *effective Elo* that its rules update during the game, and
-the app reconfigures Stockfish before every engine move:
+Each bot tracks an *effective Elo* that its rules update during the game. The
+engine always searches at **full strength**; the rating decides how much
+evaluation the bot is willing to throw away when it picks a move.
 
-- **1320–3190** — Stockfish's built-in limiter (`UCI_LimitStrength` +
-  `UCI_Elo`) is used directly. This is the engine's supported range.
-- **Below 1320** — the limiter can't go lower, so strength comes from a low or
-  negative **Skill Level** instead. This is how Stockfish's own Skill Level
-  works: it searches the position normally and then *chooses* among several
-  candidate moves with score noise that grows as the level drops. The search
-  itself is never crippled — a depth-limited engine plays alien, not weak.
+Before each engine move, FishTank runs a MultiPV search, then chooses among the
+candidates whose evaluation is within an allowance for that rating:
 
-  Classical Stockfish only accepts Skill Level 0–20; lichess reaches negative
-  levels by running Fairy-Stockfish. FishTank keeps the stock engine and
-  reimplements Stockfish's own `Skill::pick_best()` formula in JS over a
-  MultiPV list, so the level can go continuously negative down to −20. The
-  Elo → Skill mapping is anchored on lichess's published level calibration
-  (≈400 Elo → skill −9, 500 → −5, 800 → −1, 1100 → +3).
+| Rating | Allowance | In practice |
+|---|---|---|
+| 3190 | 0 cp | always the best move |
+| 2800 | 20 cp | barely distinguishable from perfect |
+| 2400 | 45 cp | small inaccuracies |
+| 2000 | 80 cp | imperfect, but **cannot hang a piece** |
+| 1600 | 130 cp | real positional errors |
+| 1200 | 200 cp | drops a pawn now and then |
+| 400 | 450 cp | drops pieces, like a beginner |
 
-  Only below ~250 Elo is a little pure randomness (max 12%) mixed in; those
-  moves are marked 🎲 in the feed.
+Moves that lose less are chosen more often, so play degrades smoothly rather
+than alternating between perfect and terrible.
 
-**Every search is time-limited, never depth-limited.** Time scales with the
-rating being asked for (600 ms below 1600, 2 s at full strength), and ranking
-every legal move (DrawFish, WorstFish) gets 800 ms. Fixed depth would make weak
-bots answer instantly and strong ones stall.
+### Why not Stockfish's own `UCI_Elo`?
 
-  The gold standard for *human-like* weak play is
-  [Maia](https://www.maiachess.com/), a neural net trained on millions of
-  human games at specific rating bands — it reproduces human mistakes rather
-  than approximating them. That needs Leela-style weights per rating, which is
-  heavy for a browser page, so it's out of scope here.
+Because it doesn't mean what it appears to. Stockfish converts the rating to an
+internal Skill Level — **`UCI_Elo 2000` becomes Skill Level 4 of 20** — and
+weakens play by *occasionally choosing a much worse move* from a short
+candidate list. The result is strong positional play punctuated by hanging a
+piece, which is not how a 2000-rated human plays. Its scale is also calibrated
+against engine opponents rather than human rating pools.
 
-Effective Elo is clamped to **100–3190**, so a bot that keeps draining (a
-long game against TiredFish, say) bottoms out at 100 rather than going
-negative.
+The bounded-loss model above gives a guarantee instead: a bot at rating R never
+plays a move worse than R's allowance, so the number on the card constrains
+what you will actually see on the board.
 
-### How accurate is the displayed rating?
+Two caveats remain. The browser build is single-threaded WASM, so its
+evaluations come from a shallower search than a native engine would produce —
+think time scales with rating (600 ms below 1600, up to 2 s at the top) to
+limit that. And the mapping from "centipawn allowance" to "human Elo" is
+judgement, not measurement: it is calibrated to behaviour (what kind of mistake
+a rating should make) rather than to tournament results.
 
-Roughly, not exactly. Three things to know:
+Below ~250 Elo a little pure randomness (max 12%) is mixed in for bots like
+RageFish that start near the floor; those moves are marked 🎲 in the feed.
+Effective Elo is clamped to **100–3190**.
 
-- **Stockfish's limiter is deliberately stochastic.** `UCI_Elo` doesn't cap
-  the search — it makes the engine *choose* a weaker move from a candidate
-  list, with noise proportional to how far below full strength you asked for.
-  A nominal 2100 will therefore hang a piece now and then, on purpose. That's
-  what a 2100 human does; it just looks jarring next to a precise number.
-- **The browser build is single-threaded WASM**, roughly an order of magnitude
-  slower than native. `UCI_Elo` produces a rating by adding noise *relative to
-  the engine's full strength*, so if the base engine is weaker than the
-  calibration assumes, everything lands below its label. FishTank compensates
-  by scaling think time with the requested rating (600 ms under 1600, up to
-  2 s at the top) rather than giving every rating the same budget.
-- **The range is read from the engine, not assumed.** FishTank parses the
-  `UCI_Elo` limits the loaded build advertises (16.1: 1320–3190; the asm.js
-  fallback: 1350–2850) and clamps to them, warning in the feed if a bot's
-  rating exceeds what that build can deliver. Before this, a fallback engine
-  could silently ignore the requested rating.
-
-Treat the number as a band, not a measurement.
+The gold standard for *human-like* weak play is
+[Maia](https://www.maiachess.com/), a neural net trained on millions of human
+games at specific rating bands — it reproduces human mistakes rather than
+approximating them. That needs Leela-style weights per rating, which is heavy
+for a browser page, so it's out of scope here.
 
 ## DragonFish and fairy variants (beta)
 

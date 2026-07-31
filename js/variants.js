@@ -3,10 +3,10 @@
  * Each variant defines how the engine's effective Elo changes during the game.
  *
  * Elo model:
- *   - Real Stockfish supports UCI_LimitStrength + UCI_Elo in [1320, 3190].
- *   - We track an effective elo in [100, 3190]. Within the engine's range it
- *     maps straight to UCI_Elo; below 1320 strength comes from low/negative
- *     Skill Level noise over a normal time-limited search (see engine.js).
+ *   - We track an effective elo in [100, 3190].
+ *   - The engine always searches at full strength; the rating decides how much
+ *     evaluation the bot is willing to throw away when picking its move
+ *     (see the bounded-loss model in engine.js).
  *   - Every search is time-limited, never depth-limited.
  */
 
@@ -22,10 +22,9 @@ function clampElo(elo) {
 /**
  * Chance of a completely random (non-engine) move.
  *
- * This used to prop up sub-1320 play, but the engine now models weak play
- * properly via Skill Level noise over a MultiPV search (engine.js), which
- * produces plausible bad moves rather than absurd ones. Only the very bottom
- * of the scale keeps a small dose of pure chaos.
+ * Strength is handled by the engine's bounded-loss model (engine.js), which
+ * already produces plausible bad moves. Only the very bottom of the scale
+ * keeps a little pure chaos, for bots like RageFish that start near 100.
  */
 function randomMoveProbability(effectiveElo) {
   if (effectiveElo >= 250) return 0;

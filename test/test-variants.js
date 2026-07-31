@@ -266,74 +266,174 @@ console.log('Displayed ratings match the code');
   }
 }
 
-console.log('Weak-play model (lichess-style skill noise)');
+console.log('Strength model (bounded evaluation loss)');
 {
   const {
-    skillForElo, multipvForSkill, pickWithSkillNoise, movetimeForElo,
+    maxLossForElo, multipvForElo, chooseWithinLoss, movetimeForElo,
     MOVETIME_MS, RANK_MOVETIME_MS, JUDGE_MOVETIME_MS,
   } = require(path.join(__dirname, '..', 'js', 'engine.js'));
 
-  // Strong settings need more time to actually reach their rating on a
-  // single-threaded WASM build; weak ones don't, so they stay snappy.
+  // Time budgets.
   assert(movetimeForElo(800) <= movetimeForElo(1800), 'weak play is not given extra time');
   assert(movetimeForElo(1800) < movetimeForElo(2600), 'stronger ratings get more time');
-  assert(movetimeForElo(3190) >= 2000, 'top strength gets a full budget');
-  assert(movetimeForElo(null) > 0, 'handles a missing rating');
-
-  // All searches are time-limited; nothing is capped by depth.
-  assert(MOVETIME_MS > 0, 'normal play uses a fixed time budget (' + MOVETIME_MS + 'ms)');
-  assert(RANK_MOVETIME_MS > 0, 'move ranking uses a fixed time budget');
-  assert(JUDGE_MOVETIME_MS > 0, 'move judging uses a fixed time budget');
+  assert(MOVETIME_MS > 0 && RANK_MOVETIME_MS > 0 && JUDGE_MOVETIME_MS > 0, 'time budgets set');
   const engineSrc = require('fs').readFileSync(
     path.join(__dirname, '..', 'js', 'engine.js'), 'utf8'
   );
   assert(!/go depth/.test(engineSrc), 'engine never issues a fixed-depth search');
-  const analysisSrc = require('fs').readFileSync(
-    path.join(__dirname, '..', 'js', 'analysis.js'), 'utf8'
+  assert(
+    !/UCI_Elo value/.test(engineSrc),
+    "Stockfish's own UCI_Elo limiter is not used (it maps 2000 Elo to Skill 4)"
   );
-  assert(!/DEPTH/.test(analysisSrc), 'analysis is time-based too');
 
-  // Calibration anchors from lichess's published AI levels.
-  assert(Math.round(skillForElo(400)) === -9, '400 Elo -> skill -9 (lichess level 1)');
-  assert(Math.round(skillForElo(500)) === -5, '500 Elo -> skill -5 (level 2)');
-  assert(Math.round(skillForElo(800)) === -1, '800 Elo -> skill -1 (level 3)');
-  assert(Math.round(skillForElo(1100)) === 3, '1100 Elo -> skill 3 (level 4)');
-  assert(skillForElo(100) === -20, 'floor Elo -> skill -20');
-  assert(skillForElo(3000) === 7, 'clamped at the top anchor');
-  assert(skillForElo(650) > skillForElo(450), 'monotonic in Elo');
+  // The allowance curve.
+  assert(maxLossForElo(3190) === 0, 'full strength always plays the best move');
+  assert(maxLossForElo(2000) < 100, '2000 tolerates less than a pawn (' + maxLossForElo(2000) + 'cp)');
+  assert(maxLossForElo(2000) < maxLossForElo(1200), 'stronger means a tighter allowance');
+  assert(maxLossForElo(400) > 300, 'a beginner may drop real material');
+  assert(maxLossForElo(-99) === maxLossForElo(100), 'clamped at the bottom');
+  assert(maxLossForElo(9999) === 0, 'clamped at the top');
+  assert(multipvForElo(3000) < multipvForElo(1000), 'weaker bots consider more candidates');
 
-  assert(multipvForSkill(3) === 4, 'non-negative skill considers 4 candidates (Stockfish default)');
-  assert(multipvForSkill(-20) > 4, 'very weak play considers a wider candidate set');
-  assert(multipvForSkill(-20) <= 12, 'candidate set stays bounded');
-
-  // Behavioural check: strong settings pick the best move far more often.
-  const ranked = [
-    { move: 'best', score: 60 },
-    { move: 'ok', score: 20 },
-    { move: 'meh', score: -40 },
-    { move: 'awful', score: -260 },
+  // A 2000 must never choose a piece-losing move.
+  const withBlunder = [
+    { move: 'best', score: 30 },
+    { move: 'slight', score: -10 },
+    { move: 'meh', score: -90 },
+    { move: 'hangsKnight', score: -280 },
+    { move: 'hangsQueen', score: -880 },
   ];
-  const rate = (skill, n = 4000) => {
-    let top = 0;
-    for (let i = 0; i < n; i++) if (pickWithSkillNoise(ranked, skill) === 'best') top++;
-    return top / n;
-  };
-  const strong = rate(15);
-  const weak = rate(-20);
-  assert(strong > weak, `skill 15 plays the best move more than skill -20 (${(strong * 100).toFixed(0)}% vs ${(weak * 100).toFixed(0)}%)`);
-  assert(weak < 0.5, 'very weak skill often rejects the best move');
+  const picks2000 = new Set();
+  for (let i = 0; i < 3000; i++) picks2000.add(chooseWithinLoss(withBlunder, 2000));
+  assert(!picks2000.has('hangsKnight'), 'a 2000 never hangs a knight');
+  assert(!picks2000.has('hangsQueen'), 'a 2000 never hangs a queen');
+  assert(picks2000.has('best'), 'a 2000 usually finds the best move');
 
-  let seen = new Set();
-  for (let i = 0; i < 500; i++) seen.add(pickWithSkillNoise(ranked, -20));
-  assert(seen.size > 1, 'weak play spreads across several candidate moves');
-  for (const m of seen) {
-    if (!ranked.some((r) => r.move === m)) {
-      failures++;
-      console.error('  FAIL - picked a move outside the candidate list: ' + m);
-    }
+  // Full strength is deterministic.
+  const picks3190 = new Set();
+  for (let i = 0; i < 500; i++) picks3190.add(chooseWithinLoss(withBlunder, 3190));
+  assert(picks3190.size === 1 && picks3190.has('best'), '3190 always plays the best move');
+
+  // A beginner does drop material.
+  const picks400 = new Set();
+  for (let i = 0; i < 3000; i++) picks400.add(chooseWithinLoss(withBlunder, 400));
+  assert(picks400.has('hangsKnight'), 'a 400 will hang a knight');
+  assert(!picks400.has('hangsQueen'), 'even a 400 stops short of the very worst move here');
+
+  // Better moves are preferred at every level.
+  const tally = { best: 0, slight: 0, meh: 0 };
+  for (let i = 0; i < 6000; i++) {
+    const m = chooseWithinLoss(withBlunder, 1600);
+    if (m in tally) tally[m]++;
   }
-  assert(true, 'only ever picks legal candidate moves');
-  assert(pickWithSkillNoise([], -5) === null, 'empty candidate list is handled');
+  assert(tally.best > tally.meh, `better moves are played more often (${tally.best} vs ${tally.meh})`);
+
+  assert(chooseWithinLoss([], 2000) === null, 'empty candidate list is handled');
+  assert(chooseWithinLoss([{ move: 'only', score: 0 }], 400) === 'only', 'forced move is played');
+}
+
+console.log('Analysis scoring');
+{
+  const { Analysis } = require(path.join(__dirname, '..', 'js', 'analysis.js'));
+  assert(Math.abs(Analysis.winPercent(0) - 50) < 1e-6, 'even position = 50% win chance');
+  assert(Analysis.winPercent(300) > 70, '+3 pawns is a large advantage (' +
+    Analysis.winPercent(300).toFixed(1) + '%)');
+  assert(Analysis.winPercent(-300) < 30, '-3 pawns is losing');
+  assert(
+    Math.abs(Analysis.winPercent(200) + Analysis.winPercent(-200) - 100) < 1e-6,
+    'win chances are symmetric'
+  );
+
+  assert(Analysis.classify(0).key === 'best', '0 cp lost = best');
+  assert(Analysis.classify(45).key === 'good', '45 cp lost = good');
+  assert(Analysis.classify(80).key === 'inaccuracy', '80 cp lost = inaccuracy');
+  assert(Analysis.classify(150).key === 'mistake', '150 cp lost = mistake');
+  assert(Analysis.classify(600).key === 'blunder', '600 cp lost = blunder');
+
+  assert(Math.abs(Analysis.moveAccuracy(50, 50) - 100) < 0.1, 'no loss = ~100% accuracy');
+  const hangQueen = Analysis.moveAccuracy(Analysis.winPercent(0), Analysis.winPercent(-900));
+  assert(hangQueen < 25, 'hanging a queen tanks accuracy (' + hangQueen.toFixed(1) + '%)');
+  assert(
+    Analysis.moveAccuracy(50, 45) > Analysis.moveAccuracy(50, 30),
+    'smaller drops score higher'
+  );
+}
+
+async function testDrawFish() {
+  console.log('DrawFish');
+  const v = VARIANTS.drawfish;
+  const s = { elo: v.baseElo, moveCount: 0 };
+  const engineWith = (ranked) => ({ rankMoves: async () => ranked });
+  {
+    assert(v.eloLabel() === '0.00', 'shows 0.00 instead of an Elo number');
+
+    // Winning moves available, but it wants the level one.
+    let res = await v.pickMove(s, {
+      engine: engineWith([
+        { move: 'd1h5', score: 620 },
+        { move: 'g1f3', score: 240 },
+        { move: 'b1c3', score: 12 },
+        { move: 'f1a6', score: -180 },
+      ]),
+      fen: 'x',
+      legalCount: 4,
+    });
+    assert(res.uci === 'b1c3', 'picks the move closest to 0.00 (+0.12), not the best (+6.20)');
+    assert(res.events[0].includes('+0.12'), 'reports the evaluation it chose');
+
+    // Negative side of zero counts equally.
+    res = await v.pickMove(s, {
+      engine: engineWith([
+        { move: 'a2a3', score: 300 },
+        { move: 'b2b3', score: -5 },
+        { move: 'c2c3', score: 40 },
+      ]),
+      fen: 'x',
+      legalCount: 3,
+    });
+    assert(res.uci === 'b2b3', 'a small negative eval beats a larger positive one');
+
+    // Losing position: least-bad option.
+    res = await v.pickMove(s, {
+      engine: engineWith([
+        { move: 'h1g1', score: -400 },
+        { move: 'h1h2', score: -900 },
+      ]),
+      fen: 'x',
+      legalCount: 2,
+    });
+    assert(res.uci === 'h1g1', 'when all moves lose, it plays the least-bad');
+
+    res = await v.pickMove(s, { engine: engineWith(null), fen: 'x', legalCount: 5 });
+    assert(res === null, 'falls through gracefully when ranking is unavailable');
+  }
+}
+
+console.log('Analysis scoring');
+{
+  const { Analysis } = require(path.join(__dirname, '..', 'js', 'analysis.js'));
+  assert(Math.abs(Analysis.winPercent(0) - 50) < 1e-6, 'even position = 50% win chance');
+  assert(Analysis.winPercent(300) > 70, '+3 pawns is a large advantage (' +
+    Analysis.winPercent(300).toFixed(1) + '%)');
+  assert(Analysis.winPercent(-300) < 30, '-3 pawns is losing');
+  assert(
+    Math.abs(Analysis.winPercent(200) + Analysis.winPercent(-200) - 100) < 1e-6,
+    'win chances are symmetric'
+  );
+
+  assert(Analysis.classify(0).key === 'best', '0 cp lost = best');
+  assert(Analysis.classify(45).key === 'good', '45 cp lost = good');
+  assert(Analysis.classify(80).key === 'inaccuracy', '80 cp lost = inaccuracy');
+  assert(Analysis.classify(150).key === 'mistake', '150 cp lost = mistake');
+  assert(Analysis.classify(600).key === 'blunder', '600 cp lost = blunder');
+
+  assert(Math.abs(Analysis.moveAccuracy(50, 50) - 100) < 0.1, 'no loss = ~100% accuracy');
+  const hangQueen = Analysis.moveAccuracy(Analysis.winPercent(0), Analysis.winPercent(-900));
+  assert(hangQueen < 25, 'hanging a queen tanks accuracy (' + hangQueen.toFixed(1) + '%)');
+  assert(
+    Analysis.moveAccuracy(50, 45) > Analysis.moveAccuracy(50, 30),
+    'smaller drops score higher'
+  );
 }
 
 async function testWorstFish() {
