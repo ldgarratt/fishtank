@@ -14,6 +14,14 @@ const ELO_MIN = 1320; // Stockfish's own UCI_Elo floor
 const ELO_MAX = 3190; // Stockfish's own UCI_Elo ceiling
 const ELO_FLOOR = 100; // our floor: below this a rating is meaningless
 
+/*
+ * Where the fish's eye sits, as a percentage of the card's fish stage. Props
+ * that belong on the face (glasses, monocles) are placed here rather than
+ * eyeballed per variant, so they can all be corrected in one place.
+ */
+const EYE_X = 41;
+const EYE_Y = 78;
+
 /** Keep an effective Elo inside [ELO_FLOOR, ELO_MAX]. */
 function clampElo(elo) {
   return Math.max(ELO_FLOOR, Math.min(ELO_MAX, elo));
@@ -139,7 +147,7 @@ const VARIANTS = {
     description: 'Plays at 3190 Elo. Every move has a flat 5% chance of being a blunder.',
     baseElo: ELO_MAX,
     demo: [['♗d3', 'best', ''], ['♔e2', 'best', ''], ['♞a3', '??', '🍺']],
-    art: { anim: 'wobble', props: [['beerMug', 70, 60, 28, 8], ['sunglasses', 53, 82, 30, -35]] },
+    art: { anim: 'wobble', props: [['beerMug', 70, 60, 28, 8], ['sunglasses', EYE_X, EYE_Y, 30, -30]] },
     blunderChance: 0.05,
     // A blunder has to actually cost something: a random legal move is often
     // just a harmless shuffle, so instead the engine ranks every move and one
@@ -196,7 +204,7 @@ const VARIANTS = {
     baseElo: Math.round((ELO_MIN + ELO_MAX) / 2),
     demo: [['♗d3', '1447', '🎲'], ['♔e2', '1447', ''], ['♕g4', '3102', '🎲']],
     // Sunglasses sit on the eye (~62%, 80% of the fish stage), not beside it.
-    art: { anim: 'bob', props: [['sunglasses', 62, 80, 32, -20], ['dice', 72, 26, 19, 15], ['dice', 86, 58, 14, -12]] },
+    art: { anim: 'bob', props: [['sunglasses', EYE_X, EYE_Y, 32, -30], ['dice', 72, 26, 19, 15], ['dice', 86, 58, 14, -12]] },
     onEngineTurnStart(state) {
       // Roll on its 1st, 4th, 7th... move, then hold that rating in between.
       if (state.moveCount % 3 !== 0) return;
