@@ -182,9 +182,12 @@ const DragonMode = (() => {
           cell.classList.add('in-check');
         }
         cell.addEventListener('click', () => onClick(sq, ch));
-        if (ch && (ch === ch.toUpperCase() ? 'w' : 'b') === playerColor) {
-          cell.addEventListener('pointerdown', (e) => startDrag(e, sq, ch, cell));
-        }
+        cell.addEventListener('pointerdown', (e) => {
+          swallowNextClick = false; // a fresh gesture: the next click is real
+          if (ch && (ch === ch.toUpperCase() ? 'w' : 'b') === playerColor) {
+            startDrag(e, sq, ch, cell);
+          }
+        });
         els.board.appendChild(cell);
       }
     }
@@ -230,6 +233,7 @@ const DragonMode = (() => {
       const dropSq = dropCell && dropCell.dataset ? dropCell.dataset.sq : null;
       if (dropSq && dropSq !== sq) onClick(dropSq, null);
       else render();
+      swallowNextClick = true; // cleared by the next pointerdown
     };
     document.addEventListener('pointermove', onMove);
     document.addEventListener('pointerup', onUp);
@@ -290,7 +294,15 @@ const DragonMode = (() => {
     };
   }
 
+  // See the note in app.js: the click that trails a tap would undo the
+  // selection the pointer handlers just made, so it is swallowed.
+  let swallowNextClick = false;
+
   function onClick(sq, ch) {
+    if (swallowNextClick) {
+      swallowNextClick = false;
+      return;
+    }
     if (!active || gameOver || thinking || !state || state.turn !== playerColor) return;
     if (ch === null) ch = fenToMap(state.fen)[sq] || undefined;
     const mine = ch && (ch === ch.toUpperCase() ? 'w' : 'b') === playerColor;

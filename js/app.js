@@ -214,6 +214,7 @@
         // for the whole game, so they are attached exactly once.
         cell.addEventListener('click', () => onSquareClick(sq));
         cell.addEventListener('pointerdown', (e) => {
+          swallowNextClick = false; // a fresh gesture: the next click is real
           const piece = game && reviewPly === null ? game.get(sq) : null;
           if (piece && piece.color === playerColor) startDrag(e, sq, cell);
         });
@@ -306,7 +307,20 @@
 
   /* ---------- interaction ---------- */
 
+  /*
+   * A tap is pointerdown + pointerup + click. The pointer handlers below
+   * already do the selecting and the dropping, and the browser then fires a
+   * click on the same square — which would read as "clicked the selected
+   * piece again" and deselect it, breaking click-to-move. That one trailing
+   * click is swallowed; any new gesture clears the flag.
+   */
+  let swallowNextClick = false;
+
   function onSquareClick(sq) {
+    if (swallowNextClick) {
+      swallowNextClick = false;
+      return;
+    }
     if (reviewPly !== null) {
       goToPly(null); // any click on the board jumps back to the live position
       return;
@@ -409,6 +423,7 @@
       } else {
         renderBoard(); // plain tap: piece stays selected for click-to-move
       }
+      swallowNextClick = true; // cleared by the next pointerdown
     };
     document.addEventListener('pointermove', onMove);
     document.addEventListener('pointerup', onUp);

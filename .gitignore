@@ -11,3 +11,6 @@ img/pieces/
 sound/
 node_modules/
 .DS_Store
+
+# Reference clone of the Maia platform (source for the encoder port), not ours
+maia-platform-frontend/

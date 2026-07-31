@@ -677,6 +677,34 @@ async function testDrawFish() {
   }
 }
 
+console.log('Click-to-move guard');
+{
+  // A tap fires pointerdown, pointerup and then click. Both boards select on
+  // pointerdown, so the trailing click lands on an already-selected square and
+  // used to deselect it, which broke click-to-move entirely. Each board must
+  // set the guard when a gesture ends and clear it when a new one starts.
+  const fs = require('fs');
+  for (const file of ['app.js', 'dragon.js']) {
+    const src = fs.readFileSync(path.join(__dirname, '..', 'js', file), 'utf8');
+    assert(/swallowNextClick = true/.test(src),
+      `${file}: the end of a pointer gesture arms the guard`);
+    assert(
+      /pointerdown['"], \(e\) => \{\s*\n\s*swallowNextClick = false/.test(src),
+      `${file}: a new pointerdown clears the guard`
+    );
+    assert(
+      /if \(swallowNextClick\) \{\s*\n\s*swallowNextClick = false;\s*\n\s*return;/.test(src),
+      `${file}: the click handler consumes the guard and stops`
+    );
+    // The guard must be consumed, never left set, or the next real click dies.
+    const armed = (src.match(/swallowNextClick = true/g) || []).length;
+    const cleared = (src.match(/swallowNextClick = false/g) || []).length;
+    assert(cleared >= armed + 1,
+      `${file}: the guard is cleared in more places than it is set ` +
+      `(${cleared} vs ${armed})`);
+  }
+}
+
 console.log('DragonFish search');
 {
   // The worker is a classic worker script, so it is loaded into a sandbox with
