@@ -295,7 +295,7 @@ const VARIANTS = {
       'Blunder deliberately at your own risk.',
     baseElo: ELO_MAX,
     demo: [['♖a8??', '2690', '−500'], ['♕xh7??', '2190', '−500'], ['♘g1??', '1690', '−500']],
-    art: { props: [['tears', 52, 92, 16, -30], ['tissueBox', 72, 58, 26, -6]] },
+    art: { props: [['tears', 54, 84, 15, -30], ['tissueBox', 72, 58, 26, -6]] },
     /** Needs the engine to rank every legal move, so this hook is async. */
     async onPlayerMoveAsync(state, ctx) {
       const { move, engine, fenBefore, legalCount } = ctx;
@@ -324,7 +324,7 @@ const VARIANTS = {
       'not the full engine, so it is beatable.',
     baseElo: null,
     demo: [['🐉d5', '♕+♘', ''], ['🐉xf7+', 'fork', '🎲'], ['🐉g6#', 'mate', '']],
-    art: { filter: 'hue-rotate(35deg) saturate(1.3)', props: [['dragonWing', 66, 40, 40, -10], ['devilHorns', 42, 71, 32, -30], ['flame', 34, 94, 16, 12]] },
+    art: { filter: 'hue-rotate(35deg) saturate(1.3)', props: [['dragonWing', 66, 40, 40, -10], ['devilHorns', 42, 71, 32, -30], ['flame', 32, 86, 15, 12]] },
   },
 
   threecheckfish: {
