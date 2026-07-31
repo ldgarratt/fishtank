@@ -9,22 +9,22 @@ installs. The app just adjusts the engine's strength settings between moves.
 
 ## The fish
 
-| Variant | | Condition |
-|---|---|---|
-| **PanicFish** | 😱 | Loses **300 Elo every time you check its king**. Sacrifice everything. Hunt the king. |
-| **TiltFish** | 🤬 | Loses **200 Elo every time you capture a piece**. Trade everything. Watch it crumble. |
-| **TiredFish** | 😴 | Loses **50 Elo every move it plays**. Survive the opening, win the endgame. |
-| **DrunkFish** | 🍺 | Full strength, but a **growing chance each move of playing a completely random move**. |
-| **RageFish** | 😡 | Starts at **200 Elo**, playing near-random moves. **Gains 200 Elo every time you capture a piece**. Don't take the bait. |
-| **GamblerFish** | 🎰 | **Re-rolls its Elo every 3 moves** — beginner to superhuman — and holds it in between. |
-| **SharkFish** | 🦈 | Starts at 1600. **Gains 150 Elo every time it checks YOUR king.** Keep your king safe. |
-| **PacifistFish** | 🕊️ | **Loses 300 Elo every time IT captures one of your pieces.** Bait it into trades. |
-| **CowardFish** | 🙈 | **Loses 100 Elo for each of your pieces on its half of the board.** March forward. |
-| **DrawFish** | 🤝 | Plays the move that keeps the evaluation **closest to 0.00**. It isn't trying to win — it's trying to draw. |
-| **WorstFish** | 💀 | Plays the **worst legal move** in every position. Hangs everything, walks into mate. |
-| **PityFish** | 😢 | Starts at 3190. **Loses 500 Elo whenever your move is the single worst legal move** in the position. |
-| **ThreeCheckFish** | ✅ | Fixed 2200 Elo, but **three-check rules: first side to give three checks wins.** It doesn't know the rule. |
-| **DragonFish** | 🐉 | **Amazon chess** (beta): each queen is a dragon that also moves like a knight. Rules by Fairy-Stockfish. |
+| Variant | Condition |
+|---|---|
+| **PanicFish** | Loses **300 Elo every time you check its king**. Sacrifice everything. Hunt the king. |
+| **TiltFish** | Loses **200 Elo every time you capture a piece**. Trade everything. Watch it crumble. |
+| **TiredFish** | Loses **50 Elo every move it plays**. Survive the opening, win the endgame. |
+| **DrunkFish** | Full strength, but a **growing chance each move of playing a completely random move**. |
+| **RageFish** | Starts at **200 Elo**, playing near-random moves. **Gains 200 Elo every time you capture a piece**. Don't take the bait. |
+| **GamblerFish** | **Re-rolls its Elo every 3 moves** — beginner to superhuman — and holds it in between. |
+| **SharkFish** | Starts at 1600. **Gains 150 Elo every time it checks YOUR king.** Keep your king safe. |
+| **PacifistFish** | **Loses 300 Elo every time IT captures one of your pieces.** Bait it into trades. |
+| **CowardFish** | **Loses 100 Elo for each of your pieces on its half of the board.** March forward. |
+| **DrawFish** | Plays the move that keeps the evaluation **closest to 0.00**. It isn't trying to win — it's trying to draw. |
+| **WorstFish** | Plays the **worst legal move** in every position. Hangs everything, walks into mate. |
+| **PityFish** | Starts at 3190. **Loses 500 Elo whenever your move is the single worst legal move** in the position. |
+| **ThreeCheckFish** | Fixed 2200 Elo, but **three-check rules: first side to give three checks wins.** It doesn't know the rule. |
+| **DragonFish** | **Amazon chess** (beta): each queen is a dragon that also moves like a knight. Rules by Fairy-Stockfish. |
 
 ## Play it
 
@@ -109,11 +109,21 @@ Below ~250 Elo a little pure randomness (max 12%) is mixed in for bots like
 RageFish that start near the floor; those moves are marked 🎲 in the feed.
 Effective Elo is clamped to **100–3190**.
 
-The gold standard for *human-like* weak play is
-[Maia](https://www.maiachess.com/), a neural net trained on millions of human
-games at specific rating bands — it reproduces human mistakes rather than
-approximating them. That needs Leela-style weights per rating, which is heavy
-for a browser page, so it's out of scope here.
+### The better answer: Maia
+
+This model bounds the *size* of a mistake but not its *kind*. A real 1200 misses
+tactics in sharp positions and plays fine in quiet ones; this one spreads its
+allowance evenly.
+
+[Maia](https://www.maiachess.com/) solves that properly — neural networks
+trained on millions of human games at each rating band, so it reproduces human
+mistakes instead of approximating them. Its own
+[platform](https://github.com/CSSLab/maia-platform-frontend) runs the models
+client-side with `onnxruntime-web` alongside a WASM Stockfish, so this is
+feasible here too. The constraints are that Maia covers 1100–1900 only (bots
+outside that range would still need this model), it returns a move but no
+evaluation (DrawFish, WorstFish, PityFish and the analysis all need Stockfish
+regardless), and each rating band is a separate model download.
 
 ## DragonFish and fairy variants (beta)
 
