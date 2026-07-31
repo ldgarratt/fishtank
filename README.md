@@ -30,7 +30,7 @@ installs. The app just adjusts the engine's strength settings between moves.
 | **ThreeCheckFish** | Fixed 2200 Elo, but **three-check rules: first side to give three checks wins.** It doesn't know the rule. |
 | **DragonFish** | **Amazon chess** (beta): the queen is replaced by a dragon, which moves like a queen *and* a knight. Pawns promote to a dragon, rook, bishop or knight. Rules by Fairy-Stockfish. |
 | **ArmyFish** | **Your knights are chancellors and your bishops are archbishops**; the engine gets a normal army. |
-| **HandicapFish** | **Your queen is a dragon** (queen + knight); its queen is an ordinary queen. |
+| **DragonlessFish** | It plays **without a dragon**; your queen moves like a queen *and* a knight, its queen does not. |
 
 ## Play it
 
@@ -161,7 +161,7 @@ Several bots hand *you* the advantage instead of weakening the engine:
   FEN fed to chess.js and Stockfish, and the PGN carries `SetUp`/`FEN` so the
   game replays correctly elsewhere. Losing a corner rook also gives up that
   side's castling right, which the FEN has to say explicitly.
-- **HandicapFish** and **ArmyFish** need pieces that standard chess does not
+- **DragonlessFish** and **ArmyFish** need pieces that standard chess does not
   have, so they are defined at runtime with `ffish.loadVariantConfig`:
 
   ```ini

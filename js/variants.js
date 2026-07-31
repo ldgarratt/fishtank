@@ -176,7 +176,9 @@ const VARIANTS = {
     description: 'Starts at 3190 Elo. Loses 50 Elo after every move it plays.',
     baseElo: ELO_MAX,
     demo: [['♗d3', '3140', '−50'], ['♔e2', '3090', '−50'], ['♕g4', '3040', '−50']],
-    art: { props: [['nightcap', 41, 72, 34, -32], ['zzz', 66, 34, 22, 0]] },
+    // The cap's band sits low-left inside its own box, so the prop has to be
+    // placed well above the eye for the band to land on the forehead.
+    art: { props: [['nightcap', 40, 62, 34, -32], ['zzz', 66, 34, 22, 0]] },
     onEngineTurnStart(state) {
       if (state.moveCount > 0) {
         state.elo = clampElo(state.elo - 50);
@@ -564,22 +566,22 @@ const VARIANTS = {
     },
   },
 
-  handicapfish: {
-    id: 'handicapfish',
-    name: 'HandicapFish',
+  dragonlessfish: {
+    id: 'dragonlessfish',
+    name: 'DragonlessFish',
     emoji: '🐲',
     fairy: true,
-    tagline: 'Your queen is a dragon. Its queen is just a queen.',
+    tagline: 'It plays without a dragon. You get one.',
     description:
       'Standard chess except that your queen moves like a queen and a knight ' +
-      'combined, while the engine keeps an ordinary queen. Rules by ' +
+      'combined, while the engine makes do with an ordinary queen. Rules by ' +
       'Fairy-Stockfish. Beta — the opponent is the built-in search.',
     baseElo: null,
     demo: [['🐲d5', '♕+♘', ''], ['🐲xf7+', 'fork', ''], ['♕d8', 'plain', '']],
     // Queen + knight: your dragon, spelled out.
     art: { props: [['pieceQueen', 50, 30, 24, -6], ['plusBadge', 64, 41, 13, 0], ['pieceKnight', 78, 52, 24, 6]] },
     fairySpec: {
-      variantName: 'handicap',
+      variantName: 'dragonless',
       glyphs: { a: '🐲' },
       values: { a: 1150 }, // amazon: queen + knight
       // Defined at runtime through ffish.loadVariantConfig, so no rebuild of
@@ -592,7 +594,7 @@ const VARIANTS = {
           playerColor === 'w'
             ? `rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/${white} w KQkq - 0 1`
             : `${black}/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1`;
-        return `[handicap:chess]\namazon = a\nstartFen = ${fen}\n`;
+        return `[dragonless:chess]\namazon = a\nstartFen = ${fen}\n`;
       },
     },
   },

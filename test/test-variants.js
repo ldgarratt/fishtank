@@ -864,7 +864,7 @@ console.log('Handicap variants');
 
   // The fairy handicaps are defined at runtime, so the config text has to be
   // well formed and the advantage has to follow the player's colour.
-  for (const id of ['handicapfish', 'armyfish']) {
+  for (const id of ['dragonlessfish', 'armyfish']) {
     const v = VARIANTS[id];
     const spec = v.fairySpec;
     assert(v.fairy === true, `${v.name} is flagged as a fairy variant`);
@@ -968,7 +968,7 @@ console.log('Card art');
     assert(px === nx && py === ny, `${VARIANTS[id].name} centres the sign on the piece`);
     assert(nsize > psize, `${VARIANTS[id].name} draws the sign larger than the piece`);
   }
-  for (const id of ['armyfish', 'handicapfish']) {
+  for (const id of ['armyfish', 'dragonlessfish']) {
     const names = VARIANTS[id].art.props.map((p) => p[0]);
     assert(names.includes('plusBadge') && names.filter((n) => n.startsWith('piece')).length === 2,
       `${VARIANTS[id].name} shows the two pieces its fairy piece combines`);
@@ -985,7 +985,7 @@ console.log('Variant ordering');
   // variants that change the rules of the game itself.
   const TAIL = [
     'queenlessfish', 'rooklessfish', 'knightlessfish', 'bishoplessfish',
-    'threecheckfish', 'dragonfish', 'armyfish', 'handicapfish',
+    'threecheckfish', 'dragonfish', 'armyfish', 'dragonlessfish',
   ];
   assert(ids.slice(-TAIL.length).join() === TAIL.join(),
     'the list ends with the odds bots then the rule-changing ones (' +

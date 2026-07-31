@@ -29,7 +29,7 @@ const DragonMode = (() => {
 
   function ensureWorker() {
     if (worker) return;
-    worker = new Worker('js/dragon-worker.js?v=51');
+    worker = new Worker('js/dragon-worker.js?v=52');
     worker.onmessage = (e) => handleMsg(e.data);
     worker.onerror = (e) => {
       hooks.setStatus(`${botName} failed to load: ` + (e.message || 'worker error'));
