@@ -804,28 +804,61 @@ console.log('Handicap variants');
   const fs = require('fs');
   const vendored = path.join(__dirname, '..', 'vendor', 'chess.js');
 
-  // OddsFish is standard chess from a lopsided position, so chess.js has to
-  // accept the FEN and the *engine* must be the side missing a queen.
-  const odds = VARIANTS.oddsfish;
-  assert(typeof odds.startFen === 'function', 'OddsFish defines a starting position');
-  assert(!odds.fairy, 'OddsFish needs no fairy engine — it is ordinary chess');
+  // The odds bots are standard chess from a lopsided position, so chess.js has
+  // to accept the FEN and the *engine* must be the side missing the piece.
+  const ODDS = {
+    queenlessfish: 'q',
+    rooklessfish: 'r',
+    knightlessfish: 'n',
+    bishoplessfish: 'b',
+  };
+  // How many of each piece a full army has, to check exactly one went missing.
+  const FULL = { q: 1, r: 2, n: 2, b: 2 };
+
+  for (const [id, piece] of Object.entries(ODDS)) {
+    const v = VARIANTS[id];
+    assert(typeof v.startFen === 'function', `${v.name} defines a starting position`);
+    assert(!v.fairy, `${v.name} needs no fairy engine — it is ordinary chess`);
+    assert(v.baseElo === ELO_MAX, `${v.name} is otherwise full strength`);
+  }
+
   if (!fs.existsSync(vendored)) {
     console.log('  skip - chess.js not vendored (run engine/get-engine.sh)');
   } else {
     const mod = require(vendored);
     const ChessCtor = mod.Chess || mod;
-    for (const playerColor of ['w', 'b']) {
-      const fen = odds.startFen(playerColor);
-      const g = new ChessCtor(fen);
-      assert(g.fen() === fen, `OddsFish (${playerColor}) FEN is valid and loads intact`);
-      assert(fen.split(' ')[1] === 'w', 'White still moves first whichever side you take');
-      const placement = fen.split(' ')[0];
-      const mine = playerColor === 'w' ? /Q/g : /q/g;
-      const theirs = playerColor === 'w' ? /q/g : /Q/g;
-      assert((placement.match(mine) || []).length === 1, 'you keep your queen');
-      assert((placement.match(theirs) || []).length === 0, 'the engine has none');
-      // Both kings present, or it is not a chess position at all.
-      assert(/K/.test(placement) && /k/.test(placement), 'both kings are on the board');
+    for (const [id, piece] of Object.entries(ODDS)) {
+      const v = VARIANTS[id];
+      for (const playerColor of ['w', 'b']) {
+        const fen = v.startFen(playerColor);
+        const g = new ChessCtor(fen);
+        assert(g.fen() === fen, `${v.name} (${playerColor}) FEN loads intact`);
+        assert(fen.split(' ')[1] === 'w', `${v.name} (${playerColor}) White still moves first`);
+
+        const placement = fen.split(' ')[0];
+        const count = (re) => (placement.match(re) || []).length;
+        const mine = playerColor === 'w' ? piece.toUpperCase() : piece;
+        const theirs = playerColor === 'w' ? piece : piece.toUpperCase();
+        assert(count(new RegExp(mine, 'g')) === FULL[piece],
+          `${v.name} (${playerColor}) your army is untouched`);
+        assert(count(new RegExp(theirs, 'g')) === FULL[piece] - 1,
+          `${v.name} (${playerColor}) the engine is exactly one ${piece} down`);
+        assert(/K/.test(placement) && /k/.test(placement),
+          `${v.name} (${playerColor}) both kings are on the board`);
+
+        // Losing a corner rook has to cost that side's castling right, or
+        // chess.js will happily try to castle with a rook that isn't there.
+        const rights = fen.split(' ')[2];
+        if (piece === 'r') {
+          const gone = playerColor === 'w' ? 'q' : 'Q';
+          assert(!rights.includes(gone),
+            `${v.name} (${playerColor}) drops the castling right for the missing rook`);
+          assert(rights.length === 3, `${v.name} (${playerColor}) keeps the other three`);
+        } else {
+          assert(rights === 'KQkq',
+            `${v.name} (${playerColor}) leaves castling rights alone`);
+        }
+      }
     }
   }
 
@@ -894,11 +927,20 @@ console.log('Variant ordering');
 {
   const fs = require('fs');
   const ids = Object.keys(VARIANTS);
-  // The rule-changing variants go last: they are not "Stockfish with a mood",
-  // they are a different game.
-  assert(ids[ids.length - 2] === 'threecheckfish' && ids[ids.length - 1] === 'dragonfish',
-    'ThreeCheckFish and DragonFish are the last two (' + ids.slice(-3).join(', ') + ')');
   assert(ids[0] === 'stockfish', 'plain Stockfish is still first');
+
+  // The tail of the list is deliberate: the material-odds bots, then the
+  // variants that change the rules of the game itself.
+  const TAIL = [
+    'queenlessfish', 'rooklessfish', 'knightlessfish', 'bishoplessfish',
+    'threecheckfish', 'dragonfish', 'armyfish', 'handicapfish',
+  ];
+  assert(ids.slice(-TAIL.length).join() === TAIL.join(),
+    'the list ends with the odds bots then the rule-changing ones (' +
+    ids.slice(-TAIL.length).join(' → ') + ')');
+  // Odds bots ascend in generosity, so the list reads as a difficulty ramp.
+  assert(ids.indexOf('queenlessfish') < ids.indexOf('threecheckfish'),
+    'the odds bots come before the rule changes');
 
   // The README table is the same list in prose; keep the two in step.
   const readme = fs.readFileSync(path.join(__dirname, '..', 'README.md'), 'utf8');

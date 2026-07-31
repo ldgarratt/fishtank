@@ -23,11 +23,14 @@ installs. The app just adjusts the engine's strength settings between moves.
 | **WorstFish** | Plays the **worst legal move** in every position. Hangs everything, walks into mate. |
 | **PityFish** | Starts at 3190. **Loses 500 Elo whenever your move is the single worst legal move** in the position. |
 | **CowardFish** | **Loses 400 Elo for each of your pieces on its half of the board.** March forward. |
-| **OddsFish** | Full strength, but **starts the game without its queen**. The classical handicap. |
-| **HandicapFish** | **Your queen is a dragon** (queen + knight); its queen is an ordinary queen. |
-| **ArmyFish** | **Your knights are chancellors and your bishops are archbishops**; the engine gets a normal army. |
+| **QueenlessFish** | Full strength, but **starts without its queen**. The classical handicap. |
+| **RooklessFish** | Full strength, but **starts without a rook** (and the castling right on that side). |
+| **KnightlessFish** | Full strength, but **starts without a knight**. The gentlest odds. |
+| **BishoplessFish** | Full strength, but **starts without a bishop**, leaving it half the board. |
 | **ThreeCheckFish** | Fixed 2200 Elo, but **three-check rules: first side to give three checks wins.** It doesn't know the rule. |
 | **DragonFish** | **Amazon chess** (beta): the queen is replaced by a dragon, which moves like a queen *and* a knight. Pawns promote to a dragon, rook, bishop or knight. Rules by Fairy-Stockfish. |
+| **ArmyFish** | **Your knights are chancellors and your bishops are archbishops**; the engine gets a normal army. |
+| **HandicapFish** | **Your queen is a dragon** (queen + knight); its queen is an ordinary queen. |
 
 ## Play it
 
@@ -150,12 +153,14 @@ since those need evaluations and Maia returns only a move distribution.
 
 ## Handicap variants
 
-Three bots hand *you* the advantage instead of weakening the engine:
+Several bots hand *you* the advantage instead of weakening the engine:
 
-- **OddsFish** is ordinary chess from a lopsided position — the engine simply
-  starts without its queen. No fairy engine involved; it is a custom start FEN
-  fed to chess.js and Stockfish, and the PGN carries `SetUp`/`FEN` so the game
-  replays correctly elsewhere.
+- **QueenlessFish**, **RooklessFish**, **KnightlessFish** and
+  **BishoplessFish** are ordinary chess from a lopsided position — the engine
+  simply starts a piece down. No fairy engine involved; it is a custom start
+  FEN fed to chess.js and Stockfish, and the PGN carries `SetUp`/`FEN` so the
+  game replays correctly elsewhere. Losing a corner rook also gives up that
+  side's castling right, which the FEN has to say explicitly.
 - **HandicapFish** and **ArmyFish** need pieces that standard chess does not
   have, so they are defined at runtime with `ffish.loadVariantConfig`:
 

@@ -58,6 +58,52 @@ function randomMoveProbability(effectiveElo) {
  * state = { elo, moveCount, playerColor, ...variant scratch }
  */
 
+/*
+ * Material-odds starting positions.
+ *
+ * The engine gives up one piece; which colour it plays depends on the side the
+ * human picked, so the FEN is built per game. Removing a corner rook also
+ * removes that side's castling right — a detail chess.js will happily accept
+ * and then get wrong later if we forget it.
+ */
+const BACK_RANK = ['r', 'n', 'b', 'q', 'k', 'b', 'n', 'r'];
+const ODDS_FILE = { q: 3, r: 0, n: 1, b: 2 };
+
+function compressRank(rank) {
+  let out = '';
+  let gap = 0;
+  for (const piece of rank) {
+    if (!piece) {
+      gap++;
+      continue;
+    }
+    if (gap) {
+      out += gap;
+      gap = 0;
+    }
+    out += piece;
+  }
+  return gap ? out + gap : out;
+}
+
+function oddsFen(piece) {
+  const idx = ODDS_FILE[piece];
+  return (playerColor) => {
+    const weakened = BACK_RANK.slice();
+    weakened[idx] = null;
+    const short = compressRank(weakened);
+    const full = BACK_RANK.join('');
+    const engineIsBlack = playerColor === 'w';
+    const lostSide = idx === 0 ? 'q' : idx === 7 ? 'k' : '';
+    const rights = engineIsBlack
+      ? 'KQ' + 'kq'.replace(lostSide, '')
+      : 'KQ'.replace(lostSide.toUpperCase(), '') + 'kq';
+    const top = engineIsBlack ? short : full;
+    const bottom = (engineIsBlack ? full : short).toUpperCase();
+    return `${top}/pppppppp/8/8/8/8/PPPPPPPP/${bottom} w ${rights} - 0 1`;
+  };
+}
+
 /** Count the player's pieces standing on the engine's half of the board. */
 function countInvaders(game, playerColor) {
   let n = 0;
@@ -356,93 +402,61 @@ const VARIANTS = {
     },
   },
 
-  oddsfish: {
-    id: 'oddsfish',
-    name: 'OddsFish',
+  queenlessfish: {
+    id: 'queenlessfish',
+    name: 'QueenlessFish',
     emoji: '♛',
     tagline: 'Full strength, but it starts without its queen.',
     description:
-      'Plain 3190 Elo Stockfish, playing the classical handicap: it begins ' +
-      'the game a queen down. No mood swings — you just have nine points ' +
-      'of material and have to convert them.',
+      'Plain 3190 Elo Stockfish playing at queen odds: it begins the game ' +
+      'without its queen. No mood swings — you are nine points up and have ' +
+      'to convert it.',
     baseElo: ELO_MAX,
     demo: [['♗d3', '3190', ''], ['♔e2', '3190', ''], ['♕—', 'odds', '']],
     art: { props: [['crown', 62, 34, 30, -12], ['whiteFlag', 34, 74, 24, 14]] },
-    /**
-     * Standard chess from a lopsided position: the *engine* loses its queen,
-     * whichever colour it ends up playing. White still moves first.
-     */
-    startFen(playerColor) {
-      return playerColor === 'w'
-        ? 'rnb1kbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
-        : 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNB1KBNR w KQkq - 0 1';
-    },
+    startFen: oddsFen('q'),
   },
 
-  handicapfish: {
-    id: 'handicapfish',
-    name: 'HandicapFish',
-    emoji: '🐲',
-    fairy: true,
-    tagline: 'Your queen is a dragon. Its queen is just a queen.',
+  rooklessfish: {
+    id: 'rooklessfish',
+    name: 'RooklessFish',
+    emoji: '♜',
+    tagline: 'Full strength, but it starts without a rook.',
     description:
-      'Standard chess except that your queen moves like a queen and a knight ' +
-      'combined, while the engine keeps an ordinary queen. Rules by ' +
-      'Fairy-Stockfish. Beta — the opponent is the built-in search.',
-    baseElo: null,
-    demo: [['🐲d5', '♕+♘', ''], ['🐲xf7+', 'fork', ''], ['♕d8', 'plain', '']],
-    art: { filter: 'hue-rotate(15deg) saturate(1.2)', props: [['dragonWing', 68, 38, 34, -10], ['crown', 38, 74, 26, -18]] },
-    fairySpec: {
-      variantName: 'handicap',
-      glyphs: { a: '🐲' },
-      values: { a: 1150 }, // amazon: queen + knight
-      // Defined at runtime through ffish.loadVariantConfig, so no rebuild of
-      // the engine is needed. Inherits everything from chess and just adds the
-      // amazon piece plus a lopsided starting position.
-      config(playerColor) {
-        const white = 'RNBAKBNR';
-        const black = 'rnbakbnr';
-        const fen =
-          playerColor === 'w'
-            ? `rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/${white} w KQkq - 0 1`
-            : `${black}/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1`;
-        return `[handicap:chess]\namazon = a\nstartFen = ${fen}\n`;
-      },
-    },
+      'Stockfish at 3190 Elo playing at rook odds: it begins without its ' +
+      "queen's rook, and without the castling rights on that side.",
+    baseElo: ELO_MAX,
+    demo: [['♗d3', '3190', ''], ['♔e2', '3190', ''], ['♖—', 'odds', '']],
+    art: { props: [['shield', 64, 36, 30, -8], ['whiteFlag', 34, 74, 22, 14]] },
+    startFen: oddsFen('r'),
   },
 
-  armyfish: {
-    id: 'armyfish',
-    name: 'ArmyFish',
-    emoji: '🦅',
-    fairy: true,
-    tagline: 'Your knights are chancellors and your bishops are archbishops.',
+  knightlessfish: {
+    id: 'knightlessfish',
+    name: 'KnightlessFish',
+    emoji: '♞',
+    tagline: 'Full strength, but it starts without a knight.',
     description:
-      'Your minor pieces are upgraded: knights become chancellors (rook + ' +
-      'knight) and bishops become archbishops (bishop + knight). The engine ' +
-      'gets an ordinary army. Rules by Fairy-Stockfish. Beta — the opponent ' +
-      'is the built-in search.',
-    baseElo: null,
-    demo: [['🏰b3', '♖+♘', ''], ['🦅c4', '♗+♘', ''], ['♘g1', 'plain', '']],
-    art: { filter: 'saturate(1.25)', props: [['shield', 68, 40, 32, 8], ['crown', 36, 74, 24, -16], ['checkMarks', 88, 62, 12, 0]] },
-    fairySpec: {
-      variantName: 'army',
-      glyphs: { c: '🏰', a: '🦅' },
-      // Here 'a' is the archbishop, not the amazon — without this override the
-      // search would price an archbishop like a queen-and-knight.
-      values: { a: 800, c: 900 },
-      config(playerColor) {
-        const upgraded = 'RCAQKACR'; // rook, chancellor, archbishop, queen, king...
-        const fen =
-          playerColor === 'w'
-            ? `rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/${upgraded} w KQkq - 0 1`
-            : `${upgraded.toLowerCase()}/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1`;
-        return (
-          '[army:chess]\narchbishop = a\nchancellor = c\n' +
-          `startFen = ${fen}\n`
-        );
-      },
-    },
+      'Stockfish at 3190 Elo playing at knight odds: it begins without its ' +
+      "queen's knight. The smallest of the odds — about three points.",
+    baseElo: ELO_MAX,
+    demo: [['♗d3', '3190', ''], ['♔e2', '3190', ''], ['♘—', 'odds', '']],
+    art: { props: [['dunceCap', 44, 40, 26, -14], ['whiteFlag', 32, 76, 22, 14]] },
+    startFen: oddsFen('n'),
+  },
+
+  bishoplessfish: {
+    id: 'bishoplessfish',
+    name: 'BishoplessFish',
+    emoji: '♝',
+    tagline: 'Full strength, but it starts without a bishop.',
+    description:
+      'Stockfish at 3190 Elo playing at bishop odds: it begins without its ' +
+      "queen's bishop, leaving it with one bishop and half the board.",
+    baseElo: ELO_MAX,
+    demo: [['♗d3', '3190', ''], ['♔e2', '3190', ''], ['♗—', 'odds', '']],
+    art: { props: [['halo', 52, 30, 40, 0], ['whiteFlag', 32, 76, 22, 14]] },
+    startFen: oddsFen('b'),
   },
 
   threecheckfish: {
@@ -509,6 +523,72 @@ const VARIANTS = {
     baseElo: null,
     demo: [['🐉d5', '♕+♘', ''], ['🐉xf7+', 'fork', '🎲'], ['🐉g6#', 'mate', '']],
     art: { filter: 'hue-rotate(35deg) saturate(1.3)', props: [['dragonWing', 66, 40, 40, -10], ['devilHorns', 42, 71, 32, -30], ['flame', 32, 86, 15, 12]] },
+  },
+
+  armyfish: {
+    id: 'armyfish',
+    name: 'ArmyFish',
+    emoji: '🦅',
+    fairy: true,
+    tagline: 'Your knights are chancellors and your bishops are archbishops.',
+    description:
+      'Your minor pieces are upgraded: knights become chancellors (rook + ' +
+      'knight) and bishops become archbishops (bishop + knight). The engine ' +
+      'gets an ordinary army. Rules by Fairy-Stockfish. Beta — the opponent ' +
+      'is the built-in search.',
+    baseElo: null,
+    demo: [['🏰b3', '♖+♘', ''], ['🦅c4', '♗+♘', ''], ['♘g1', 'plain', '']],
+    art: { filter: 'saturate(1.25)', props: [['shield', 68, 40, 32, 8], ['crown', 36, 74, 24, -16], ['checkMarks', 88, 62, 12, 0]] },
+    fairySpec: {
+      variantName: 'army',
+      glyphs: { c: '🏰', a: '🦅' },
+      // Here 'a' is the archbishop, not the amazon — without this override the
+      // search would price an archbishop like a queen-and-knight.
+      values: { a: 800, c: 900 },
+      config(playerColor) {
+        const upgraded = 'RCAQKACR'; // rook, chancellor, archbishop, queen, king...
+        const fen =
+          playerColor === 'w'
+            ? `rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/${upgraded} w KQkq - 0 1`
+            : `${upgraded.toLowerCase()}/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1`;
+        return (
+          '[army:chess]\narchbishop = a\nchancellor = c\n' +
+          `startFen = ${fen}\n`
+        );
+      },
+    },
+  },
+
+  handicapfish: {
+    id: 'handicapfish',
+    name: 'HandicapFish',
+    emoji: '🐲',
+    fairy: true,
+    tagline: 'Your queen is a dragon. Its queen is just a queen.',
+    description:
+      'Standard chess except that your queen moves like a queen and a knight ' +
+      'combined, while the engine keeps an ordinary queen. Rules by ' +
+      'Fairy-Stockfish. Beta — the opponent is the built-in search.',
+    baseElo: null,
+    demo: [['🐲d5', '♕+♘', ''], ['🐲xf7+', 'fork', ''], ['♕d8', 'plain', '']],
+    art: { filter: 'hue-rotate(15deg) saturate(1.2)', props: [['dragonWing', 68, 38, 34, -10], ['crown', 38, 74, 26, -18]] },
+    fairySpec: {
+      variantName: 'handicap',
+      glyphs: { a: '🐲' },
+      values: { a: 1150 }, // amazon: queen + knight
+      // Defined at runtime through ffish.loadVariantConfig, so no rebuild of
+      // the engine is needed. Inherits everything from chess and just adds the
+      // amazon piece plus a lopsided starting position.
+      config(playerColor) {
+        const white = 'RNBAKBNR';
+        const black = 'rnbakbnr';
+        const fen =
+          playerColor === 'w'
+            ? `rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/${white} w KQkq - 0 1`
+            : `${black}/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1`;
+        return `[handicap:chess]\namazon = a\nstartFen = ${fen}\n`;
+      },
+    },
   },
 };
 
