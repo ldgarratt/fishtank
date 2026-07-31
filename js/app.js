@@ -39,6 +39,7 @@
 
   let engine = null;
   let engineReady = false;
+  let enginePromise = null; // resolves (true/false) once loading settles
   const sound = new SoundBox();
   let game = null; // chess.js instance
   let variant = null;
@@ -162,6 +163,11 @@
 
   /* ---------- board rendering ---------- */
 
+  const PIECE_NAMES = { p: 'pawn', n: 'knight', b: 'bishop', r: 'rook', q: 'queen', k: 'king' };
+  function pieceLabel(piece) {
+    return (piece.color === 'w' ? 'white ' : 'black ') + PIECE_NAMES[piece.type];
+  }
+
   function squareName(fileIdx, rankIdx) {
     return 'abcdefgh'[fileIdx] + (8 - rankIdx);
   }
@@ -186,6 +192,8 @@
         cell.className = 'sq ' + (((rr + ff) % 2 === 0) ? 'light' : 'dark');
         cell.dataset.sq = sq;
         const piece = game.get(sq);
+        cell.setAttribute('role', 'gridcell');
+        cell.setAttribute('aria-label', sq + (piece ? ', ' + pieceLabel(piece) : ', empty'));
         if (piece) {
           const name = piece.color + piece.type.toUpperCase() + '.svg';
           const img = document.createElement('img');
@@ -431,6 +439,32 @@
     if (gameOver) return;
     thinking = true;
     setStatus(`${variant.name} is thinking…`);
+
+    // The engine loads asynchronously; a deep link or a fast first move can
+    // arrive before it is ready. Wait for it rather than calling a dead worker.
+    if (!engineReady && enginePromise) {
+      setStatus('Waiting for Stockfish to load…');
+      await enginePromise;
+      if (gameOver || !game) { thinking = false; return; }
+      setStatus(`${variant.name} is thinking…`);
+    }
+    if (!engineReady) {
+      // Still no engine: play a legal move so the game never hangs.
+      const moves = game.moves({ verbose: true });
+      if (!moves.length) { thinking = false; checkGameEnd(); return; }
+      const m = moves[Math.floor(Math.random() * moves.length)];
+      const played = game.move(m.san);
+      logMove(variant.name, played.san + '  🎲');
+      logEvent('⚠️ Engine unavailable — playing a random move.');
+      sound.play(played.captured ? 'capture' : 'move');
+      vstate.moveCount += 1;
+      thinking = false;
+      renderBoard();
+      if (checkGameEnd()) return;
+      setStatus('Your move.');
+      tryPremove();
+      return;
+    }
 
     const events = (variant.onEngineTurnStart && variant.onEngineTurnStart(vstate, game)) || [];
     for (const ev of events) logEvent(ev);
@@ -753,6 +787,7 @@
     els.status.textContent = text;
   }
 
+
   function sleep(ms) {
     return new Promise((r) => setTimeout(r, ms));
   }
@@ -790,15 +825,20 @@
     applyLocation();
 
     engine = new SillyEngine();
-    try {
-      const name = await engine.init((s) => (els.engineStatus.textContent = s));
-      engineReady = true;
-      els.engineStatus.textContent = '⚙️ ' + name;
-    } catch (err) {
-      els.engineStatus.textContent =
-        '⚠️ Could not load Stockfish (offline?). Reload the page to retry.';
-      console.error(err);
-    }
+    enginePromise = engine
+      .init((s) => (els.engineStatus.textContent = s))
+      .then((name) => {
+        engineReady = true;
+        els.engineStatus.textContent = '⚙️ ' + name;
+        return true;
+      })
+      .catch((err) => {
+        els.engineStatus.textContent =
+          '⚠️ Could not load Stockfish (offline?). Reload the page to retry.';
+        console.error(err);
+        return false;
+      });
+    await enginePromise;
   }
 
   boot();

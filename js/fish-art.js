@@ -6,7 +6,11 @@
  * fish's head, so the bot reads as a character.
  *
  * Coordinates are percentages of the fish box, so everything scales together:
- *   [propName, xPercent, yPercent, sizePx, rotationDeg]
+ *   [propName, xPercent, yPercent, sizePercent, rotationDeg]
+ *
+ * Some props below are unused by the current line-up (clownWig, redNose,
+ * glasses, bowTie, partyHorn, crown, bloodDrip, shield) — they are kept as a
+ * palette for new variants.
  */
 
 const FishArt = (() => {
@@ -322,11 +326,12 @@ const FishArt = (() => {
       ),
   };
 
-  /** Build the HTML for one variant's card art. */
-  function cardArt(v) {
+  /**
+   * The costumed fish itself: a head-anchored zoom of the photo with SVG props
+   * layered on top. Shared by the picker cards and the in-game avatar.
+   */
+  function fishFigure(v, imgClass) {
     const art = v.art || {};
-    // Zoom about the fish's head (~30%,75% of the photo) so that point stays
-    // put and prop coordinates below are stable.
     const fishStyle =
       `transform-origin:${HEAD_ORIGIN};transform:${art.transform || 'scale(1.3)'};` +
       `filter:${art.filter || 'none'}`;
@@ -341,11 +346,19 @@ const FishArt = (() => {
       })
       .join('');
     return (
+      `<img class="${imgClass}" style="${fishStyle}" src="img/stockfish.png" ` +
+      `alt="" aria-hidden="true" onerror="this.remove()">` + props
+    );
+  }
+
+  /** Build the HTML for one variant's card art. */
+  function cardArt(v) {
+    const art = v.art || {};
+    return (
       `<div class="thumb">` +
       `<div class="thumb-evals">${demoRows(v)}</div>` +
       `<div class="fish-stage ${art.anim || ''}">` +
-      `<img class="thumb-fish" style="${fishStyle}" src="img/stockfish.png" alt="" onerror="this.remove()">` +
-      props +
+      fishFigure(v, 'thumb-fish') +
       `</div>` +
       `</div>`
     );
@@ -369,28 +382,10 @@ const FishArt = (() => {
 
   /** Avatar-sized version for the in-game bot card. */
   function avatar(v) {
-    const art = v.art || {};
-    // Zoom about the fish's head (~30%,75% of the photo) so that point stays
-    // put and prop coordinates below are stable.
-    const fishStyle =
-      `transform-origin:${HEAD_ORIGIN};transform:${art.transform || 'scale(1.3)'};` +
-      `filter:${art.filter || 'none'}`;
-    const props = (art.props || [])
-      .map(([name, x, y, size, rot = 0]) => {
-        const draw = PROPS[name];
-        if (!draw) return '';
-        return (
-          `<span class="prop" style="left:${x}%;top:${y}%;width:${size}%;` +
-          `transform:translate(-50%,-50%) rotate(${rot}deg)">${draw()}</span>`
-        );
-      })
-      .join('');
-    return (
-      `<img style="${fishStyle}" src="img/stockfish.png" alt="" onerror="this.remove()">` + props
-    );
+    return fishFigure(v, '');
   }
 
-  return { PROPS, cardArt, avatar };
+  return { PROPS, cardArt, avatar, fishFigure };
 })();
 
 if (typeof module !== 'undefined' && module.exports) {

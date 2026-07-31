@@ -13,7 +13,7 @@
   <meta property="og:type" content="website" />
   <meta property="og:url" content="https://ldgarratt.github.io/fishtank/" />
   <meta property="og:image" content="https://ldgarratt.github.io/fishtank/img/stockfish.png" />
-  <link rel="stylesheet" href="css/style.css?v=27" />
+  <link rel="stylesheet" href="css/style.css?v=28" />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80'>🐟</text></svg>" />
 </head>
 <body>
@@ -25,7 +25,7 @@
         <p class="subtitle">Stockfish bots whose strength changes as the game unfolds.</p>
       </div>
     </a>
-    <div id="engine-status" class="engine-status">Loading engine…</div>
+    <div id="engine-status" class="engine-status" role="status">Loading engine…</div>
   </header>
 
   <!-- Variant picker -->
@@ -53,15 +53,15 @@
           </div>
         </div>
         <div class="elo-wrap">
-          <div class="elo-track"><div id="elo-bar" class="elo-bar"></div></div>
+          <div class="elo-track" role="img" aria-label="Opponent strength"><div id="elo-bar" class="elo-bar"></div></div>
         </div>
       </div>
       <div class="board-col">
         <div class="board-wrap">
-          <div id="board" class="board"></div>
+          <div id="board" class="board" role="grid" aria-label="Chess board"></div>
           <div id="promo" class="promo hidden"></div>
         </div>
-        <div id="status" class="status"></div>
+        <div id="status" class="status" role="status" aria-live="polite"></div>
         <div class="controls">
           <button id="btn-rematch" class="primary hidden">⚔️ Rematch</button>
           <button id="btn-undo">↩️ Undo</button>
@@ -76,7 +76,7 @@
       <div class="log-col">
         <div id="analysis" class="analysis hidden"></div>
         <h2>Feed</h2>
-        <div id="log" class="log"></div>
+        <div id="log" class="log" role="log" aria-live="polite"></div>
       </div>
     </div>
   </main>
@@ -110,14 +110,14 @@
         ['vendor/chess.js',
          'https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js',
          'https://cdn.jsdelivr.net/npm/chess.js@0.10.3/chess.js'],
-        ['js/variants.js?v=27'],
-        ['js/engine.js?v=27'],
-        ['js/sound.js?v=27'],
-        ['js/analysis.js?v=27'],
-        ['js/fish-art.js?v=27'],
-        ['js/fairy-engine.js?v=27'],
-        ['js/dragon.js?v=27'],
-        ['js/app.js?v=27'],
+        ['js/variants.js?v=28'],
+        ['js/engine.js?v=28'],
+        ['js/sound.js?v=28'],
+        ['js/analysis.js?v=28'],
+        ['js/fish-art.js?v=28'],
+        ['js/fairy-engine.js?v=28'],
+        ['js/dragon.js?v=28'],
+        ['js/app.js?v=28'],
       ]);
     })();
   </script>
