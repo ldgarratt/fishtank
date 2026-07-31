@@ -12,6 +12,7 @@ const {
 
 let failures = 0;
 let testDrunkFishBlunders = async () => {};
+let testAnalysisBestMoves = async () => {};
 function assert(cond, msg) {
   if (cond) console.log('  ok - ' + msg);
   else {
@@ -824,6 +825,58 @@ console.log('Best-move arrows');
   assert(/renderArrows\(\);/.test(src), 'the board render draws the arrows');
 }
 
+console.log('Analysis best-move data');
+{
+  // Every analysed position must carry a best move for the arrow to draw,
+  // including the positions where the player already found it — that was the
+  // bug: the arrow only appeared on mistakes, unlike lichess.
+  const { Analysis } = require(path.join(__dirname, '..', 'js', 'analysis.js'));
+  const vendored = path.join(__dirname, '..', 'vendor', 'chess.js');
+  if (!require('fs').existsSync(vendored)) {
+    console.log('  (skipped: run engine/get-engine.sh to vendor chess.js)');
+  } else {
+    global.Chess = require(vendored).Chess || require(vendored);
+
+    // A scripted engine that always wants to develop the kingside knight. The
+    // move has to stay legal in every position it is offered for, or the SAN
+    // conversion fails and the entry looks like "you played the best move".
+    const bestFor = { w: 'g1f3', b: 'g8f6' };
+    const fakeEngine = {
+      setFullStrength() {},
+      async evaluate(fen) {
+        const turn = fen.split(' ')[1];
+        return { cp: 20, mate: null, best: bestFor[turn] };
+      },
+    };
+
+    const walk = new global.Chess();
+    walk.move('e4'); // not what the engine wanted
+    walk.move('e5'); // nor this
+    walk.move('Nf3'); // this one matches the engine's choice exactly
+    const history = walk.history({ verbose: true });
+
+    // Registered with the async runner at the bottom so failures are counted.
+    testAnalysisBestMoves = async () => {
+      const report = await Analysis.run(fakeEngine, history, () => {});
+      assert(report.moves.length === 3, 'every move is analysed');
+      assert(report.moves.every((m) => m.bestUci),
+        'every analysed position carries a best move for the arrow');
+      assert(report.moves[0].bestUci === 'g1f3',
+        'the best move is kept in UCI, ready to draw');
+      assert(report.moves[0].best === 'Nf3',
+        'the written list names the better move when you missed it');
+      // The regression: this move WAS the best, and used to lose its arrow.
+      assert(report.moves[2].best === null,
+        'the list stays quiet when you played the best move');
+      assert(report.moves[2].bestUci === 'g1f3',
+        'but the arrow still has a move to draw there');
+      assert(report.moves.every((m, i) => m.ply === i),
+        'each entry knows the ply to jump to');
+      assert(report.moves[0].playedUci === 'e2e4', 'the played move is kept too');
+    };
+  }
+}
+
 console.log('Click-to-move guard');
 {
   // A tap fires pointerdown, pointerup and then click. Both boards select on
@@ -1003,6 +1056,7 @@ console.log('DragonFish search');
 // Async suites run last, then the overall result is reported.
 (async () => {
   await testDrunkFishBlunders();
+  await testAnalysisBestMoves();
   await testDrawFish();
   await testWorstFish();
   await testPityFish();

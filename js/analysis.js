@@ -154,9 +154,12 @@ const Analysis = (() => {
       counts[mover][cls.key] += 1;
       lossTotals[mover] += loss;
 
-      const bestUci = scored[i].best;
+      const bestUci = scored[i].best && scored[i].best !== '(none)' ? scored[i].best : null;
       const bestSan = uciToSan(fens[i], bestUci);
-      const wasBest = !bestSan || bestSan === pgnMoves[i].san;
+      // Only for the written list: "best: Nf3" is noise when you played Nf3.
+      // The arrow uses bestUci, which is kept either way — and kept even when
+      // the SAN conversion fails, since drawing only needs the two squares.
+      const wasBest = bestSan && bestSan === pgnMoves[i].san;
       moves.push({
         n: Math.floor(i / 2) + 1,
         // Plies played before this move — the position the board shows when
@@ -168,8 +171,9 @@ const Analysis = (() => {
         cls,
         evalAfter: mover === 'w' ? after : -after, // White's perspective
         best: wasBest ? null : bestSan,
-        // Kept in UCI too so the board can draw it as an arrow.
-        bestUci: wasBest ? null : bestUci,
+        // Always kept, so the board can draw the engine's move as an arrow at
+        // every position — including the ones you got right.
+        bestUci,
         playedUci: pgnMoves[i].from + pgnMoves[i].to + (pgnMoves[i].promotion || ''),
       });
       graph.push(mover === 'w' ? after : -after);

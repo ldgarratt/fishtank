@@ -324,8 +324,9 @@
 
   /**
    * While reviewing an analysed game, show the move Stockfish preferred in the
-   * position on screen — the same cue lichess draws. Nothing is drawn at the
-   * live position, or where the move played was already the best one.
+   * position on screen — the same cue lichess draws, at every position you
+   * step to, including the ones where you found the best move yourself.
+   * Nothing is drawn at the live position, which has no "next move" to suggest.
    */
   function renderArrows() {
     if (!els.arrows) return;
@@ -884,11 +885,11 @@
       });
       analysisReport = report;
       renderAnalysis(report);
-      // Land on the first real mistake so the arrow has something to show.
+      // Drop into review at the first real mistake, or the start of the game
+      // if there wasn't one, so the arrow is visible straight away.
       const first = report.moves.find((m) => m.cls.key === 'blunder')
-        || report.moves.find((m) => m.cls.key === 'mistake')
-        || report.moves.find((m) => m.bestUci);
-      if (first) goToPly(first.ply);
+        || report.moves.find((m) => m.cls.key === 'mistake');
+      goToPly(first ? first.ply : 0);
     } catch (err) {
       els.analysis.innerHTML = '<h2>Analysis</h2><div class="an-note">Analysis failed: ' + err + '</div>';
     } finally {
