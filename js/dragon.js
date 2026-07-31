@@ -235,6 +235,61 @@ const DragonMode = (() => {
     document.addEventListener('pointerup', onUp);
   }
 
+  /* ---------- promotion picker ---------- */
+
+  // Dragon first: it is the strongest piece and the usual choice.
+  const PROMO_ORDER = ['a', 'r', 'b', 'n'];
+
+  function promoButton(letter) {
+    if (letter === 'a') {
+      return `<button data-uci-suffix="a" title="Dragon">
+                <span class="dragon-piece ${playerColor === 'w' ? 'dragon-white' : 'dragon-black'}">🐉</span>
+              </button>`;
+    }
+    const name = playerColor + letter.toUpperCase() + '.svg';
+    return `<button data-uci-suffix="${letter}" title="${letter.toUpperCase()}">
+              <img src="img/pieces/${name}" alt="${letter}"
+                   onerror="this.onerror=null;this.src='${DRAGON_CDN_PIECES + name}'">
+            </button>`;
+  }
+
+  function hidePromo() {
+    const promo = document.getElementById('promo');
+    if (!promo) return;
+    promo.classList.add('hidden');
+    promo.innerHTML = '';
+    promo.onclick = null;
+  }
+
+  function showPromo(promos) {
+    const promo = document.getElementById('promo');
+    if (!promo) {
+      // No picker element (shouldn't happen): fall back to the dragon.
+      worker.postMessage({ type: 'push', uci: promos[0] });
+      return;
+    }
+    const available = PROMO_ORDER.filter((p) => promos.some((m) => m[4] === p));
+    promo.innerHTML =
+      '<div class="promo-inner">' + available.map(promoButton).join('') + '</div>';
+    promo.classList.remove('hidden');
+
+    const close = hidePromo;
+    promo.querySelectorAll('button').forEach((b) => {
+      b.onclick = (e) => {
+        e.stopPropagation();
+        const uci = promos.find((m) => m[4] === b.dataset.uciSuffix);
+        close();
+        if (uci) worker.postMessage({ type: 'push', uci });
+        else render();
+      };
+    });
+    // Clicking outside the buttons cancels the move.
+    promo.onclick = () => {
+      close();
+      render();
+    };
+  }
+
   function onClick(sq, ch) {
     if (!active || gameOver || thinking || !state || state.turn !== playerColor) return;
     if (ch === null) ch = fenToMap(state.fen)[sq] || undefined;
@@ -249,13 +304,14 @@ const DragonMode = (() => {
         (m) => m.slice(0, 2) === selected && m.slice(2, 4) === sq
       );
       if (candidates.length) {
-        // Promotions: prefer dragon, then queen (beta: no picker in this mode).
-        const uci =
-          candidates.find((m) => m.length > 4 && m[4] === 'a') ||
-          candidates.find((m) => m.length > 4 && m[4] === 'q') ||
-          candidates[0];
         selected = null;
-        worker.postMessage({ type: 'push', uci });
+        // A pawn reaching the last rank has several legal moves to the same
+        // square, one per promotion piece. In amazon chess there is no queen
+        // to promote to — the dragon takes its place — so the choice is
+        // dragon, rook, bishop or knight.
+        const promos = candidates.filter((m) => m.length > 4);
+        if (promos.length > 1) showPromo(promos);
+        else worker.postMessage({ type: 'push', uci: candidates[0] });
         return;
       }
     }
@@ -287,6 +343,7 @@ const DragonMode = (() => {
     },
     stop() {
       active = false;
+      hidePromo();
     },
     undo() {
       if (!active || thinking || !state) return;

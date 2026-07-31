@@ -262,6 +262,11 @@ main { flex: 1; width: 100%; max-width: 1280px; margin: 0 auto; padding: 12px 24
 }
 .promo-inner button:hover { border-color: var(--accent); }
 .promo-inner img { width: 100%; height: 100%; }
+/* The dragon is an emoji rather than an SVG, so it needs centring by hand. */
+.promo-inner .dragon-piece {
+  display: flex; align-items: center; justify-content: center;
+  width: 100%; height: 100%; font-size: 40px;
+}
 
 .controls { display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
 .controls button {
