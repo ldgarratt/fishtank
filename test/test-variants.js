@@ -249,9 +249,16 @@ console.log('Random-move probability model');
 console.log('Weak-play model (lichess-style skill noise)');
 {
   const {
-    skillForElo, multipvForSkill, pickWithSkillNoise,
+    skillForElo, multipvForSkill, pickWithSkillNoise, movetimeForElo,
     MOVETIME_MS, RANK_MOVETIME_MS, JUDGE_MOVETIME_MS,
   } = require(path.join(__dirname, '..', 'js', 'engine.js'));
+
+  // Strong settings need more time to actually reach their rating on a
+  // single-threaded WASM build; weak ones don't, so they stay snappy.
+  assert(movetimeForElo(800) <= movetimeForElo(1800), 'weak play is not given extra time');
+  assert(movetimeForElo(1800) < movetimeForElo(2600), 'stronger ratings get more time');
+  assert(movetimeForElo(3190) >= 2000, 'top strength gets a full budget');
+  assert(movetimeForElo(null) > 0, 'handles a missing rating');
 
   // All searches are time-limited; nothing is capped by depth.
   assert(MOVETIME_MS > 0, 'normal play uses a fixed time budget (' + MOVETIME_MS + 'ms)');

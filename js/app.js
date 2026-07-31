@@ -1,5 +1,5 @@
 /* FishTank — main app: board UI, game loop, variant wiring. */
-/* global Chess, VARIANTS, randomMoveProbability, clampUciElo, ELO_MIN, ELO_MAX, SillyEngine, SoundBox, DragonMode, Analysis, FishArt */
+/* global Chess, VARIANTS, randomMoveProbability, clampUciElo, ELO_MIN, ELO_MAX, SillyEngine, SoundBox, DragonMode, Analysis, FishArt, movetimeForElo */
 
 (() => {
   // cburnett SVG pieces (CC BY-SA 3.0) — same look locally and deployed:
@@ -547,7 +547,7 @@
       logMove(variant.name, san + '  🎲');
     } else {
       engine.setStrength(vstate.elo);
-      const uci = await engine.bestMove(game.fen(), MOVETIME_MS);
+      const uci = await engine.bestMove(game.fen(), movetimeForElo(vstate.elo));
       if (!uci || uci === '(none)') {
         thinking = false;
         checkGameEnd();

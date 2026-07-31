@@ -86,10 +86,10 @@ the app reconfigures Stockfish before every engine move:
   Only below ~250 Elo is a little pure randomness (max 12%) mixed in; those
   moves are marked 🎲 in the feed.
 
-**Every search is time-limited, never depth-limited** — 800 ms for a normal
-move, and the same budget when a bot ranks all legal moves (DrawFish,
-WorstFish). Fixed depth would make weak bots answer instantly and strong ones
-stall, and it makes strength depend on the machine.
+**Every search is time-limited, never depth-limited.** Time scales with the
+rating being asked for (600 ms below 1600, 2 s at full strength), and ranking
+every legal move (DrawFish, WorstFish) gets 800 ms. Fixed depth would make weak
+bots answer instantly and strong ones stall.
 
   The gold standard for *human-like* weak play is
   [Maia](https://www.maiachess.com/), a neural net trained on millions of
@@ -111,8 +111,11 @@ Roughly, not exactly. Three things to know:
   A nominal 2100 will therefore hang a piece now and then, on purpose. That's
   what a 2100 human does; it just looks jarring next to a precise number.
 - **The browser build is single-threaded WASM**, roughly an order of magnitude
-  slower than native, and each move gets 800 ms. Stockfish's calibration
-  assumes more, so ratings tend to land a little below their label.
+  slower than native. `UCI_Elo` produces a rating by adding noise *relative to
+  the engine's full strength*, so if the base engine is weaker than the
+  calibration assumes, everything lands below its label. FishTank compensates
+  by scaling think time with the requested rating (600 ms under 1600, up to
+  2 s at the top) rather than giving every rating the same budget.
 - **The range is read from the engine, not assumed.** FishTank parses the
   `UCI_Elo` limits the loaded build advertises (16.1: 1320–3190; the asm.js
   fallback: 1350–2850) and clamps to them, warning in the feed if a bot's

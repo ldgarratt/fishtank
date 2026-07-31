@@ -33,7 +33,20 @@
 // bots answer instantly and strong ones stall. Strength below the engine's
 // Elo floor comes from Skill Level noise instead (which is how Stockfish's own
 // Skill Level works — it searches normally and simply chooses badly).
-const MOVETIME_MS = 800; // normal play
+/**
+ * Think time by requested rating. Stockfish's UCI_Elo calibration assumes a
+ * full-strength base engine; a single-threaded WASM build needs more time to
+ * reach the level it is being asked to play at. Weak settings don't need it,
+ * so the pace only slows where accuracy actually depends on it.
+ */
+function movetimeForElo(elo) {
+  if (!elo || elo < 1600) return 600;
+  if (elo < 2000) return 900;
+  if (elo < 2500) return 1400;
+  return 2000;
+}
+
+const MOVETIME_MS = 800; // fallback when no rating applies (fairy/DragonFish)
 const RANK_MOVETIME_MS = 800; // ranking every legal move (DrawFish, WorstFish)
 const JUDGE_MOVETIME_MS = 550; // ranking to judge the player's move (PityFish)
 
@@ -343,12 +356,14 @@ class SillyEngine {
    */
   async rankMoves(fen, legalCount, movetimeMs = RANK_MOVETIME_MS) {
     if (!legalCount) return null;
-    const ranked = await this._rankFrom(fen, Math.min(250, legalCount), movetimeMs);
-    this.lastElo = null; // caller's strength settings were disturbed
-    return ranked;
+    return this._rankFrom(fen, Math.min(250, legalCount), movetimeMs);
   }
 
-  /** Shared MultiPV ranking. Leaves MultiPV back at 1. */
+  /**
+   * Shared MultiPV ranking. Turns the limiter off to get honest scores, so it
+   * must invalidate the cached strength: otherwise the next setStrength() with
+   * an unchanged rating would early-return and leave the engine unlimited.
+   */
   async _rankFrom(fen, multipv, movetimeMs) {
     this.send('setoption name UCI_LimitStrength value false');
     this.send('setoption name Skill Level value 20');
@@ -383,6 +398,7 @@ class SillyEngine {
     });
 
     this.send('setoption name MultiPV value 1');
+    this.lastElo = null; // strength settings were disturbed; force a reconfigure
 
     if (!lines.size) return null;
     void result;
@@ -435,6 +451,7 @@ if (typeof module !== 'undefined' && module.exports) {
     skillForElo,
     multipvForSkill,
     pickWithSkillNoise,
+    movetimeForElo,
     MOVETIME_MS,
     RANK_MOVETIME_MS,
     JUDGE_MOVETIME_MS,
