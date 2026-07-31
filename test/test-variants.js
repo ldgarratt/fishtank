@@ -102,20 +102,35 @@ console.log('GamblerFish');
 {
   const v = VARIANTS.gamblerfish;
   const s = { elo: v.baseElo, moveCount: 0 };
-  let min = Infinity, max = -Infinity;
-  for (let i = 0; i < 2000; i++) {
+
+  // Rolls on move 0, holds for moves 1 and 2, rolls again on move 3.
+  const evs = v.onEngineTurnStart(s);
+  const firstRoll = s.elo;
+  assert(evs && evs.length === 1, 'announces the roll (it is not secret)');
+  s.moveCount = 1;
+  assert(v.onEngineTurnStart(s) === undefined && s.elo === firstRoll, 'holds on move 2');
+  s.moveCount = 2;
+  assert(v.onEngineTurnStart(s) === undefined && s.elo === firstRoll, 'holds on move 3');
+  s.moveCount = 3;
+  v.onEngineTurnStart(s);
+  assert(true, 're-rolls on the 4th move (new value ' + s.elo + ')');
+
+  // Rolls stay in range and span it.
+  let min = Infinity, max = -Infinity, rolls = 0;
+  for (let i = 0; i < 6000; i++) {
+    s.moveCount = i;
+    const before = s.elo;
     v.onEngineTurnStart(s);
+    if (s.elo !== before) rolls++;
     min = Math.min(min, s.elo);
     max = Math.max(max, s.elo);
-    assert2(s.elo >= ELO_MIN && s.elo <= ELO_MAX);
-  }
-  assert(min < ELO_MIN + 300 && max > ELO_MAX - 300, `rolls span the range (saw ${min}–${max})`);
-  function assert2(c) {
-    if (!c) {
+    if (s.elo < ELO_MIN || s.elo > ELO_MAX) {
       failures++;
       console.error('  FAIL - roll out of range: ' + s.elo);
     }
   }
+  assert(min < ELO_MIN + 300 && max > ELO_MAX - 300, `rolls span the range (saw ${min}–${max})`);
+  assert(rolls > 1500 && rolls < 2100, `rolls roughly every 3rd move (${rolls} of 6000)`);
 }
 
 console.log('SharkFish');

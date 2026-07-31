@@ -184,14 +184,19 @@ const VARIANTS = {
     id: 'gamblerfish',
     name: 'GamblerFish',
     emoji: '🎰',
-    tagline: 'Its Elo secretly re-rolls every single move.',
-    description: 'Its Elo is re-rolled uniformly between 1320 and 3190 before each of its moves.',
+    tagline: 'Re-rolls its Elo every 3 moves. You can see the result.',
+    description:
+      'Every 3 moves it rolls a new Elo, uniformly between 1320 and 3190, and ' +
+      'plays at that strength until the next roll. The roll is shown in the ' +
+      'feed and in its rating.',
     baseElo: Math.round((ELO_MIN + ELO_MAX) / 2),
-    demo: [['♗d3', '1447', '🎲'], ['♔e2', '3102', '🎲'], ['♕g4', '1893', '🎲']],
+    demo: [['♗d3', '1447', '🎲'], ['♔e2', '1447', ''], ['♕g4', '3102', '🎲']],
     art: { anim: 'bob', props: [['sunglasses', 53, 82, 30, -35], ['dice', 72, 26, 19, 15], ['dice', 86, 58, 14, -12]] },
     onEngineTurnStart(state) {
+      // Roll on its 1st, 4th, 7th... move, then hold that rating in between.
+      if (state.moveCount % 3 !== 0) return;
       state.elo = ELO_MIN + Math.floor(Math.random() * (ELO_MAX - ELO_MIN + 1));
-      return [`🎰 Rolled ${state.elo} Elo for this move`];
+      return [`🎰 Rolled ${state.elo} Elo — playing at this strength for 3 moves`];
     },
   },
 

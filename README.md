@@ -16,7 +16,7 @@ installs. The app just adjusts the engine's strength settings between moves.
 | **TiredFish** | 😴 | Loses **50 Elo every move it plays**. Survive the opening, win the endgame. |
 | **DrunkFish** | 🍺 | Full strength, but a **growing chance each move of playing a completely random move**. |
 | **RageFish** | 😡 | Starts at **200 Elo**, playing near-random moves. **Gains 200 Elo every time you capture a piece**. Don't take the bait. |
-| **GamblerFish** | 🎰 | Its Elo **secretly re-rolls every move** — beginner to superhuman. Good luck. |
+| **GamblerFish** | 🎰 | **Re-rolls its Elo every 3 moves** — beginner to superhuman — and holds it in between. |
 | **SharkFish** | 🦈 | Starts at 1600. **Gains 150 Elo every time it checks YOUR king.** Keep your king safe. |
 | **PacifistFish** | 🕊️ | **Loses 300 Elo every time IT captures one of your pieces.** Bait it into trades. |
 | **CowardFish** | 🙈 | **Loses 100 Elo for each of your pieces on its half of the board.** March forward. |
