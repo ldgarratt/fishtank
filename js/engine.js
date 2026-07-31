@@ -123,6 +123,8 @@ class SillyEngine {
     this.listeners = [];
     this.lastElo = null;
     this.emulatedSkill = null;
+    this.eloRange = null; // filled from the engine's own option list
+    this.hasSkill = false;
   }
 
   _spawnLocal(src) {
@@ -148,6 +150,7 @@ class SillyEngine {
   _tryInit(src, timeoutMs) {
     return new Promise((resolve, reject) => {
       let worker;
+      const options = [];
       try {
         worker = src.kind === 'local' ? this._spawnLocal(src) : this._spawnCdn(src);
       } catch (e) {
@@ -171,11 +174,12 @@ class SillyEngine {
       };
       worker.onmessage = (e) => {
         const line = typeof e.data === 'string' ? e.data : (e.data && e.data.data) || '';
+        if (line.startsWith('option name')) options.push(line);
         if (line.startsWith('uciok') || line.includes('uciok')) {
           if (!settled) {
             settled = true;
             clearTimeout(timer);
-            resolve(worker);
+            resolve({ worker, options });
           }
         }
       };
@@ -188,7 +192,9 @@ class SillyEngine {
     for (const src of ENGINE_SOURCES) {
       try {
         if (onStatus) onStatus('Loading ' + src.name + '…');
-        this.worker = await this._tryInit(src, src.kind === 'local' ? 15000 : 25000);
+        const started = await this._tryInit(src, src.kind === 'local' ? 15000 : 25000);
+        this.worker = started.worker;
+        this._readOptions(started.options);
         this.sourceName = src.name;
         this.worker.onerror = null;
         this.worker.onmessage = (e) => {
@@ -204,6 +210,36 @@ class SillyEngine {
       }
     }
     throw lastErr || new Error('No engine source could be loaded');
+  }
+
+  /**
+   * Read the engine's advertised UCI options. Different builds support
+   * different ranges (Stockfish 16.1: UCI_Elo 1320-3190; Stockfish 10:
+   * 1350-2850), and a build might not support the limiter at all — trusting
+   * hardcoded numbers would mean displaying a rating the engine never applied.
+   */
+  _readOptions(lines) {
+    this.eloRange = null;
+    this.hasSkill = false;
+    for (const line of lines || []) {
+      if (/^option name UCI_Elo\b/.test(line)) {
+        const min = line.match(/\bmin (-?\d+)/);
+        const max = line.match(/\bmax (-?\d+)/);
+        if (min && max) {
+          this.eloRange = { min: parseInt(min[1], 10), max: parseInt(max[1], 10) };
+        }
+      } else if (/^option name Skill Level\b/.test(line)) {
+        this.hasSkill = true;
+      }
+    }
+    if (!this.eloRange) {
+      console.warn('Engine does not advertise UCI_Elo; using Skill Level for all ratings.');
+    }
+  }
+
+  /** The strongest rating this engine can actually be asked for. */
+  maxRating() {
+    return this.eloRange ? this.eloRange.max : 3190;
   }
 
   send(cmd) {
@@ -232,12 +268,14 @@ class SillyEngine {
     if (elo === this.lastElo) return;
     this.lastElo = elo;
 
-    if (elo >= 1320) {
+    // Use the limiter only where this build actually supports it.
+    const range = this.eloRange;
+    if (range && elo >= range.min) {
       this.emulatedSkill = null;
       this.send('setoption name MultiPV value 1');
       this.send('setoption name Skill Level value 20');
       this.send('setoption name UCI_LimitStrength value true');
-      this.send('setoption name UCI_Elo value ' + Math.min(3190, elo));
+      this.send('setoption name UCI_Elo value ' + Math.min(range.max, elo));
       return;
     }
 

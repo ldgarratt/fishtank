@@ -184,11 +184,10 @@ const VARIANTS = {
     id: 'gamblerfish',
     name: 'GamblerFish',
     emoji: '🎰',
-    tagline: 'Re-rolls its Elo every 3 moves. You can see the result.',
+    tagline: 'Re-rolls its Elo every 3 moves.',
     description:
       'Every 3 moves it rolls a new Elo, uniformly between 1320 and 3190, and ' +
-      'plays at that strength until the next roll. The roll is shown in the ' +
-      'feed and in its rating.',
+      'plays at that strength until the next roll.',
     baseElo: Math.round((ELO_MIN + ELO_MAX) / 2),
     demo: [['♗d3', '1447', '🎲'], ['♔e2', '1447', ''], ['♕g4', '3102', '🎲']],
     art: { anim: 'bob', props: [['sunglasses', 53, 82, 30, -35], ['dice', 72, 26, 19, 15], ['dice', 86, 58, 14, -12]] },

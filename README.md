@@ -101,9 +101,25 @@ Effective Elo is clamped to **100–3190**, so a bot that keeps draining (a
 long game against TiredFish, say) bottoms out at 100 rather than going
 negative.
 
-Note on accuracy: the browser build is a single-threaded WASM engine, so
-nominal ratings run a bit below their native-hardware calibration. Treat the
-displayed Elo as a good approximation, not a lab measurement.
+### How accurate is the displayed rating?
+
+Roughly, not exactly. Three things to know:
+
+- **Stockfish's limiter is deliberately stochastic.** `UCI_Elo` doesn't cap
+  the search — it makes the engine *choose* a weaker move from a candidate
+  list, with noise proportional to how far below full strength you asked for.
+  A nominal 2100 will therefore hang a piece now and then, on purpose. That's
+  what a 2100 human does; it just looks jarring next to a precise number.
+- **The browser build is single-threaded WASM**, roughly an order of magnitude
+  slower than native, and each move gets 800 ms. Stockfish's calibration
+  assumes more, so ratings tend to land a little below their label.
+- **The range is read from the engine, not assumed.** FishTank parses the
+  `UCI_Elo` limits the loaded build advertises (16.1: 1320–3190; the asm.js
+  fallback: 1350–2850) and clamps to them, warning in the feed if a bot's
+  rating exceeds what that build can deliver. Before this, a fallback engine
+  could silently ignore the requested rating.
+
+Treat the number as a band, not a measurement.
 
 ## DragonFish and fairy variants (beta)
 

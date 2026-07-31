@@ -141,7 +141,16 @@
     renderBoard();
     sound.play('start');
 
-    if (engine && engineReady) engine.newGame();
+    if (engine && engineReady) {
+      engine.newGame();
+      const ceiling = engine.maxRating();
+      if (vstate.elo > ceiling) {
+        logEvent(
+          `⚠️ This engine build tops out at ${ceiling} Elo, so ratings above ` +
+          `that play at ${ceiling}.`
+        );
+      }
+    }
 
     if (playerColor === 'b') {
       setTimeout(engineMove, 400);
