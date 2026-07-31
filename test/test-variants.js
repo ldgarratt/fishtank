@@ -266,6 +266,69 @@ console.log('Displayed ratings match the code');
   }
 }
 
+console.log('Maia encoder (ported from CSSLab/maia-platform-frontend)');
+{
+  const fs = require('fs');
+  const vendored = path.join(__dirname, '..', 'vendor', 'chess.js');
+  if (!fs.existsSync(vendored)) {
+    console.log('  skip - chess.js not vendored (run engine/get-engine.sh)');
+  } else {
+    const chessMod = require(vendored);
+    global.Chess = chessMod.Chess || chessMod;
+    const { MaiaEncode } = require(path.join(__dirname, '..', 'js', 'maia-encode.js'));
+    const fwd = require(path.join(__dirname, '..', 'js', 'data', 'all_moves_maia3.json'));
+    const rev = require(path.join(__dirname, '..', 'js', 'data', 'all_moves_maia3_reversed.json'));
+    MaiaEncode.setMoveTables(fwd, rev);
+
+    assert(Object.keys(fwd).length === 4352, 'move table has the 4352 entries the model expects');
+
+    // Mirroring (Maia always sees the board from White's side).
+    assert(MaiaEncode.mirrorSquare('e2') === 'e7', 'mirrorSquare e2 -> e7');
+    assert(MaiaEncode.mirrorMove('e2e4') === 'e7e5', 'mirrorMove e2e4 -> e7e5');
+    assert(MaiaEncode.mirrorMove('a7a8q') === 'a2a1q', 'promotion suffix survives mirroring');
+    assert(MaiaEncode.swapCastlingRights('Kq') === 'Qk', 'castling rights swap sides');
+    const start = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
+    assert(MaiaEncode.mirrorFEN(MaiaEncode.mirrorFEN(start)) === start, 'mirroring twice is identity');
+
+    // Board tensor.
+    const t = MaiaEncode.boardToTokens(start);
+    assert(t.length === 64 * 12, 'tensor is 64x12');
+    assert(t.reduce((a, b) => a + b, 0) === 32, 'exactly 32 pieces encoded');
+    assert(t[0 * 12 + 3] === 1, 'a1 encodes a white rook');
+    assert(t[4 * 12 + 5] === 1, 'e1 encodes a white king');
+    assert(t[60 * 12 + 11] === 1, 'e8 encodes a black king');
+
+    // Legal-move mask.
+    let pre = MaiaEncode.preprocess(start);
+    assert(pre.blackToMove === false, 'white to move needs no mirroring');
+    assert(pre.legalMask.reduce((a, b) => a + b, 0) === 20, '20 legal moves from the start');
+
+    // Black to move: mirrored in, mirrored back out.
+    const afterE4 = 'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1';
+    pre = MaiaEncode.preprocess(afterE4);
+    assert(pre.blackToMove === true, 'black to move is mirrored');
+    assert(pre.legalMask[fwd['e2e4']] === 1, "black's e7e5 appears as e2e4 to the model");
+
+    const logits = new Float32Array(4352);
+    logits[fwd['e2e4']] = 10;
+    const dec = MaiaEncode.decode(logits, Float32Array.from([0, 0, 2]), pre.legalMask, pre.blackToMove);
+    assert(MaiaEncode.topMove(dec.policy) === 'e7e5', 'top move mirrors back to e7e5');
+    const total = Object.values(dec.policy).reduce((a, b) => a + b, 0);
+    assert(Math.abs(total - 1) < 1e-6, 'policy is a probability distribution');
+    assert(dec.winProb > 0.7, 'value head decodes to a win probability');
+
+    // Everything Maia can return must be legal in the real position.
+    const real = new global.Chess(afterE4);
+    const legal = new Set(
+      real.moves({ verbose: true }).map((m) => m.from + m.to + (m.promotion || ''))
+    );
+    assert(
+      Object.keys(dec.policy).every((m) => legal.has(m)),
+      'policy only ever contains legal moves'
+    );
+  }
+}
+
 console.log('Strength model (bounded evaluation loss)');
 {
   const {

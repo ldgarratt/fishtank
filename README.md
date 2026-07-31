@@ -109,21 +109,35 @@ Below ~250 Elo a little pure randomness (max 12%) is mixed in for bots like
 RageFish that start near the floor; those moves are marked 🎲 in the feed.
 Effective Elo is clamped to **100–3190**.
 
-### The better answer: Maia
+### Maia: human-like play where it's trained
+
+Bots whose current rating falls between **1100 and 1900** play through
+[Maia](https://www.maiachess.com/) instead — a neural network trained on
+millions of human games that predicts *the move a player of that rating would
+actually play*. FishTank samples from that distribution, so the mistakes are
+human mistakes rather than an engine occasionally throwing a piece.
+
+Maia 3 is a single model that takes both players' ratings as inputs, so one
+network covers the whole band and a bot's rating can drift mid-game without
+swapping models. It is ~44 MB, downloaded on first use and cached in
+IndexedDB; until it arrives (or if it fails) those bots fall back to the model
+below. Outside 1100–1900 — full-strength bots, and beginners under 1100 —
+Maia has no training data, so the bounded-loss model is used there.
+
+The encoding, move table and inference setup are ported from the Maia
+platform's own implementation
+([CSSLab/maia-platform-frontend](https://github.com/CSSLab/maia-platform-frontend),
+GPL-3.0) so the tensors match what the model was trained on.
+
+### The fallback: bounded loss
 
 This model bounds the *size* of a mistake but not its *kind*. A real 1200 misses
 tactics in sharp positions and plays fine in quiet ones; this one spreads its
 allowance evenly.
 
-[Maia](https://www.maiachess.com/) solves that properly — neural networks
-trained on millions of human games at each rating band, so it reproduces human
-mistakes instead of approximating them. Its own
-[platform](https://github.com/CSSLab/maia-platform-frontend) runs the models
-client-side with `onnxruntime-web` alongside a WASM Stockfish, so this is
-feasible here too. The constraints are that Maia covers 1100–1900 only (bots
-outside that range would still need this model), it returns a move but no
-evaluation (DrawFish, WorstFish, PityFish and the analysis all need Stockfish
-regardless), and each rating band is a separate model download.
+Maia (above) covers 1100–1900. Outside that band this model is what runs, and
+it is also what DrawFish, WorstFish, PityFish and the post-game analysis use,
+since those need evaluations and Maia returns only a move distribution.
 
 ## DragonFish and fairy variants (beta)
 

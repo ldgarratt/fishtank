@@ -78,5 +78,19 @@ curl -fsSL -o ../coi-serviceworker.js \
   "https://cdn.jsdelivr.net/npm/coi-serviceworker/coi-serviceworker.min.js" \
   || { echo "warn: coi-serviceworker not downloaded"; rm -f ../coi-serviceworker.js; }
 
+# Maia 3: human-like play for ratings in its trained band (GPL-3.0, UofT
+# CSSLab). Large (~44 MB) but cached in the browser after the first load.
+MAIA_SRC="https://raw.githubusercontent.com/CSSLab/maia-platform-frontend/main/public"
+mkdir -p maia3 ort
+if curl -fsSL -o maia3/maia3_simplified.onnx "$MAIA_SRC/maia3/maia3_simplified.onnx" &&
+   curl -fsSL -o ort/ort.wasm.min.js "$MAIA_SRC/ort/ort.wasm.min.js" &&
+   curl -fsSL -o ort/ort-wasm-simd-threaded.wasm "$MAIA_SRC/ort/ort-wasm-simd-threaded.wasm" &&
+   curl -fsSL -o ort/ort-wasm-simd-threaded.mjs "$MAIA_SRC/ort/ort-wasm-simd-threaded.mjs"; then
+  echo "Maia model + ONNX runtime downloaded"
+else
+  echo "warn: Maia assets not downloaded; those bots fall back to Stockfish"
+  rm -rf maia3 ort
+fi
+
 echo "Done. Files downloaded:"
 ls -lh stockfish-16.1-lite-single.* ../vendor/chess.js

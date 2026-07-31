@@ -1,5 +1,5 @@
 /* FishTank — main app: board UI, game loop, variant wiring. */
-/* global Chess, VARIANTS, randomMoveProbability, ELO_MIN, ELO_MAX, ELO_FLOOR, SillyEngine, SoundBox, DragonMode, Analysis, FishArt, movetimeForElo */
+/* global Chess, VARIANTS, randomMoveProbability, ELO_MIN, ELO_MAX, ELO_FLOOR, SillyEngine, SoundBox, DragonMode, Analysis, FishArt, MaiaEngine, movetimeForElo */
 
 (() => {
   // cburnett SVG pieces (CC BY-SA 3.0) — same look locally and deployed:
@@ -585,7 +585,54 @@
       }
     }
 
+    // Maia: for ratings inside its trained band, ask the human-like model
+    // first. Its mistakes are the mistakes players of that rating actually
+    // make, rather than an engine occasionally throwing a piece.
+    let maiaMove = null;
+    if (!picked && !variant.pickMove && MaiaEngine.inBand(vstate.elo)) {
+      if (!MaiaEngine.isReady() && !MaiaEngine.isDisabled()) {
+        setStatus('Downloading Maia (human-like model, one time)…');
+      }
+      const got = await MaiaEngine.ensureReady((loaded, total) => {
+        if (total) {
+          const pct = Math.round((loaded / total) * 100);
+          setStatus(`Downloading Maia… ${pct}%`);
+        }
+      });
+      if (got) {
+        setStatus(`${variant.name} is thinking…`);
+        const res = await MaiaEngine.pickMove(game.fen(), Math.round(vstate.elo));
+        if (res && game.moves({ verbose: true }).some(
+          (m) => m.from + m.to + (m.promotion || '') === res.uci
+        )) {
+          maiaMove = res;
+        }
+      }
+    }
+
+    if (maiaMove) {
+      const played = game.move({
+        from: maiaMove.uci.slice(0, 2),
+        to: maiaMove.uci.slice(2, 4),
+        promotion: maiaMove.uci.length > 4 ? maiaMove.uci[4] : undefined,
+      });
+      if (played) {
+        san = played.san;
+        engMove = played;
+        engineCaptured = !!played.captured;
+        logMove(variant.name, san);
+        if (!vstate.maiaAnnounced) {
+          vstate.maiaAnnounced = true;
+          logEvent('🧠 Playing via Maia — a model trained on human games at this rating.');
+        }
+      } else {
+        maiaMove = null;
+      }
+    }
+
     if (picked && picked.uci && san) {
+      // move already played above
+    } else if (maiaMove && san) {
       // move already played above
     } else if (Math.random() < pRandom) {
       const moves = game.moves({ verbose: true });
