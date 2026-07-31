@@ -31,12 +31,12 @@ console.log('PanicFish');
   const s = { elo: v.baseElo, moveCount: 0 };
   assert(v.baseElo === ELO_MAX, 'starts at max elo ' + ELO_MAX);
   v.onPlayerMove(s, quiet, inCheck);
-  assert(s.elo === ELO_MAX - 500, 'check costs 500');
+  assert(s.elo === ELO_MAX - 300, 'check costs 300');
   v.onPlayerMove(s, quiet, notInCheck);
-  assert(s.elo === ELO_MAX - 500, 'quiet move costs nothing');
+  assert(s.elo === ELO_MAX - 300, 'quiet move costs nothing');
   v.onPlayerMove(s, quiet, inCheck);
   v.onPlayerMove(s, quiet, inCheck);
-  assert(s.elo === ELO_MAX - 3 * 500, 'three checks -> ' + s.elo);
+  assert(s.elo === ELO_MAX - 3 * 300, 'three checks -> ' + s.elo);
   for (let i = 0; i < 12; i++) v.onPlayerMove(s, quiet, inCheck);
   assert(s.elo === ELO_FLOOR, 'a hail of checks bottoms out at the floor');
   assert(

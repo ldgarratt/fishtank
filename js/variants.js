@@ -83,15 +83,15 @@ const VARIANTS = {
     id: 'panicfish',
     name: 'PanicFish',
     emoji: '😱',
-    tagline: 'Loses 500 Elo every time you check its king.',
-    description: 'Starts at 3190 Elo. Loses 500 Elo each time you give check.',
+    tagline: 'Loses 300 Elo every time you check its king.',
+    description: 'Starts at 3190 Elo. Loses 300 Elo each time you give check.',
     baseElo: ELO_MAX,
-    demo: [['♗b5+', '2690', '−500'], ['♕h5+', '2190', '−500'], ['♖e8+', '1690', '−500']],
+    demo: [['♗b5+', '2890', '−300'], ['♕h5+', '2590', '−300'], ['♖e8+', '2290', '−300']],
     art: { anim: 'shake', props: [['alarmBell', 66, 24, 28, 12], ['exclaim', 84, 54, 11, 8], ['sweat', 34, 62, 12, -25], ['sweat', 62, 68, 10, 20]] },
     onPlayerMove(state, move, game) {
       if (game.in_check()) {
-        state.elo = clampElo(state.elo - 500);
-        return [`♚ Check: −500 Elo → ${state.elo}`];
+        state.elo = clampElo(state.elo - 300);
+        return [`♚ Check: −300 Elo → ${state.elo}`];
       }
     },
   },
