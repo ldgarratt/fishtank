@@ -195,7 +195,8 @@ const VARIANTS = {
       'plays at that strength until the next roll.',
     baseElo: Math.round((ELO_MIN + ELO_MAX) / 2),
     demo: [['♗d3', '1447', '🎲'], ['♔e2', '1447', ''], ['♕g4', '3102', '🎲']],
-    art: { anim: 'bob', props: [['sunglasses', 53, 82, 30, -35], ['dice', 72, 26, 19, 15], ['dice', 86, 58, 14, -12]] },
+    // Sunglasses sit on the eye (~62%, 80% of the fish stage), not beside it.
+    art: { anim: 'bob', props: [['sunglasses', 62, 80, 32, -20], ['dice', 72, 26, 19, 15], ['dice', 86, 58, 14, -12]] },
     onEngineTurnStart(state) {
       // Roll on its 1st, 4th, 7th... move, then hold that rating in between.
       if (state.moveCount % 3 !== 0) return;
@@ -321,19 +322,30 @@ const VARIANTS = {
     },
   },
 
-  dragonfish: {
-    id: 'dragonfish',
-    name: 'DragonFish',
-    emoji: '🐉',
-    fairy: true,
-    tagline: 'Dragon chess: each queen is a dragon that also moves like a knight.',
+  cowardfish: {
+    id: 'cowardfish',
+    name: 'CowardFish',
+    emoji: '🙈',
+    tagline: 'Loses 400 Elo for each of your pieces on its half of the board.',
     description:
-      'Amazon chess, with rules from Fairy-Stockfish: both queens are dragons ' +
-      '(queen + knight movement). Beta — the opponent is a built-in search, ' +
-      'not the full engine, so it is beatable.',
-    baseElo: null,
-    demo: [['🐉d5', '♕+♘', ''], ['🐉xf7+', 'fork', '🎲'], ['🐉g6#', 'mate', '']],
-    art: { filter: 'hue-rotate(35deg) saturate(1.3)', props: [['dragonWing', 66, 40, 40, -10], ['devilHorns', 42, 71, 32, -30], ['flame', 32, 86, 15, 12]] },
+      'Plays at 3190 Elo minus 400 for each of your pieces currently on its ' +
+      'half of the board. Recovers as they leave.',
+    baseElo: ELO_MAX,
+    demo: [['♙e5', '2790', '−400'], ['♘f5', '2390', '−400'], ['♕h5', '1990', '−400']],
+    art: { anim: 'shake', props: [['whiteFlag', 66, 40, 32, 10], ['sweat', 44, 70, 12, -20]] },
+    onEngineTurnStart(state, game) {
+      const invaders = countInvaders(game, state.playerColor);
+      state.elo = clampElo(this.baseElo - 400 * invaders);
+      if (invaders !== (state.lastInvaders || 0)) {
+        state.lastInvaders = invaders;
+        if (invaders > 0) {
+          return [
+            `🙈 ${invaders} of your piece${invaders === 1 ? '' : 's'} on its half: Elo → ${state.elo}`,
+          ];
+        }
+        return [`🙈 No invaders on its half: Elo → ${state.elo}`];
+      }
+    },
   },
 
   threecheckfish: {
@@ -387,30 +399,19 @@ const VARIANTS = {
     },
   },
 
-  cowardfish: {
-    id: 'cowardfish',
-    name: 'CowardFish',
-    emoji: '🙈',
-    tagline: 'Loses 100 Elo for each of your pieces on its half of the board.',
+  dragonfish: {
+    id: 'dragonfish',
+    name: 'DragonFish',
+    emoji: '🐉',
+    fairy: true,
+    tagline: 'Dragon chess: each queen is a dragon that also moves like a knight.',
     description:
-      'Plays at 3190 Elo minus 100 for each of your pieces currently on its ' +
-      'half of the board. Recovers as they leave.',
-    baseElo: ELO_MAX,
-    demo: [['♙e5', '3090', '−100'], ['♘f5', '2990', '−100'], ['♕h5', '2890', '−100']],
-    art: { anim: 'shake', props: [['whiteFlag', 66, 40, 32, 10], ['sweat', 44, 70, 12, -20]] },
-    onEngineTurnStart(state, game) {
-      const invaders = countInvaders(game, state.playerColor);
-      state.elo = clampElo(this.baseElo - 100 * invaders);
-      if (invaders !== (state.lastInvaders || 0)) {
-        state.lastInvaders = invaders;
-        if (invaders > 0) {
-          return [
-            `🙈 ${invaders} of your piece${invaders === 1 ? '' : 's'} on its half: Elo → ${state.elo}`,
-          ];
-        }
-        return [`🙈 No invaders on its half: Elo → ${state.elo}`];
-      }
-    },
+      'Amazon chess, with rules from Fairy-Stockfish: both queens are dragons ' +
+      '(queen + knight movement). Beta — the opponent is a built-in search, ' +
+      'not the full engine, so it is beatable.',
+    baseElo: null,
+    demo: [['🐉d5', '♕+♘', ''], ['🐉xf7+', 'fork', '🎲'], ['🐉g6#', 'mate', '']],
+    art: { filter: 'hue-rotate(35deg) saturate(1.3)', props: [['dragonWing', 66, 40, 40, -10], ['devilHorns', 42, 71, 32, -30], ['flame', 32, 86, 15, 12]] },
   },
 };
 

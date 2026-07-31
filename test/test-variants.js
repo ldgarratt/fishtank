@@ -210,7 +210,7 @@ console.log('CowardFish');
   const board = { e5: { color: 'w', type: 'p' }, f6: { color: 'w', type: 'n' }, e4: { color: 'w', type: 'p' }, d8: { color: 'b', type: 'q' } };
   const fakeGame = { get: (sq) => board[sq] || null };
   const evs = v.onEngineTurnStart(s, fakeGame);
-  assert(s.elo === 3190 - 200, 'two invaders (e5, f6) -> −200; own-half piece (e4) free');
+  assert(s.elo === 3190 - 800, 'two invaders (e5, f6) -> −800; own-half piece (e4) free');
   assert(evs && evs.length === 1, 'announces the invasion');
   const evs2 = v.onEngineTurnStart(s, fakeGame);
   assert(evs2 === undefined, 'no repeat announcement while count unchanged');
@@ -723,6 +723,24 @@ async function testDrawFish() {
     res = await v.pickMove(s, { engine: engineWith(null), fen: 'x', legalCount: 5 });
     assert(res === null, 'falls through gracefully when ranking is unavailable');
   }
+}
+
+console.log('Variant ordering');
+{
+  const fs = require('fs');
+  const ids = Object.keys(VARIANTS);
+  // The rule-changing variants go last: they are not "Stockfish with a mood",
+  // they are a different game.
+  assert(ids[ids.length - 2] === 'threecheckfish' && ids[ids.length - 1] === 'dragonfish',
+    'ThreeCheckFish and DragonFish are the last two (' + ids.slice(-3).join(', ') + ')');
+  assert(ids[0] === 'stockfish', 'plain Stockfish is still first');
+
+  // The README table is the same list in prose; keep the two in step.
+  const readme = fs.readFileSync(path.join(__dirname, '..', 'README.md'), 'utf8');
+  const listed = [...readme.matchAll(/^\| \*\*(\w+)\*\* \|/gm)].map((m) => m[1]);
+  const expected = ids.filter((id) => id !== 'stockfish').map((id) => VARIANTS[id].name);
+  assert(listed.join() === expected.join(),
+    'the README table lists the same fish in the same order');
 }
 
 console.log('Cache versioning');
