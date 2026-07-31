@@ -2,7 +2,7 @@
 
 const path = require('path');
 const {
-  VARIANTS, randomMoveProbability, clampUciElo, clampElo, ELO_MIN, ELO_MAX, ELO_FLOOR,
+  VARIANTS, randomMoveProbability, clampElo, ELO_MIN, ELO_MAX, ELO_FLOOR,
 } = require(path.join(
   __dirname,
   '..',
@@ -39,7 +39,6 @@ console.log('PanicFish');
   assert(s.elo === ELO_MAX - 3 * 500, 'three checks -> ' + s.elo);
   for (let i = 0; i < 12; i++) v.onPlayerMove(s, quiet, inCheck);
   assert(s.elo === ELO_FLOOR, 'a hail of checks bottoms out at the floor');
-  assert(clampUciElo(s.elo) === ELO_MIN, 'uci elo clamps at floor');
   assert(
     randomMoveProbability(1000) === 0,
     'below the engine floor it still plays real (skill-noised) moves, not random ones'
@@ -242,8 +241,29 @@ console.log('Random-move probability model');
   assert(randomMoveProbability(ELO_MIN) === 0, 'no random moves at engine floor');
   assert(randomMoveProbability(250) === 0, 'no random moves at 250+ (skill noise handles it)');
   assert(randomMoveProbability(0) === 0.12, 'capped at 12% at the very bottom');
-  assert(clampUciElo(99999) === ELO_MAX, 'clamp upper');
-  assert(clampUciElo(-5) === ELO_MIN, 'clamp lower');
+}
+
+console.log('Displayed ratings match the code');
+{
+  for (const v of Object.values(VARIANTS)) {
+    const copy = (v.description || '') + ' ' + (v.tagline || '');
+    // "Starts at N Elo" / "Plays at N Elo" / "Fixed N Elo" must match baseElo.
+    const claim = copy.match(/(?:Starts at|Plays at|Fixed) ([\d]{2,4}) Elo/);
+    if (claim) {
+      const stated = parseInt(claim[1], 10);
+      assert(
+        v.baseElo === stated,
+        `${v.name} says it starts at ${stated} and baseElo is ${v.baseElo}`
+      );
+    }
+    // Every rated bot must start inside the range we can actually apply.
+    if (!v.fairy && !v.eloLabel) {
+      assert(
+        v.baseElo >= ELO_FLOOR && v.baseElo <= ELO_MAX,
+        `${v.name} starts inside [${ELO_FLOOR}, ${ELO_MAX}] (${v.baseElo})`
+      );
+    }
+  }
 }
 
 console.log('Weak-play model (lichess-style skill noise)');

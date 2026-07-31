@@ -1,5 +1,5 @@
 /* FishTank — main app: board UI, game loop, variant wiring. */
-/* global Chess, VARIANTS, randomMoveProbability, clampUciElo, ELO_MIN, ELO_MAX, SillyEngine, SoundBox, DragonMode, Analysis, FishArt, movetimeForElo */
+/* global Chess, VARIANTS, randomMoveProbability, ELO_MIN, ELO_MAX, ELO_FLOOR, SillyEngine, SoundBox, DragonMode, Analysis, FishArt, movetimeForElo */
 
 (() => {
   // cburnett SVG pieces (CC BY-SA 3.0) — same look locally and deployed:
@@ -20,6 +20,7 @@
     board: document.getElementById('board'),
     log: document.getElementById('log'),
     eloBar: document.getElementById('elo-bar'),
+    eloWrap: document.getElementById('elo-wrap'),
     avatar: document.getElementById('bot-avatar'),
     oppName: document.getElementById('opp-name'),
     oppDesc: document.getElementById('opp-desc'),
@@ -99,6 +100,7 @@
       els.oppName.innerHTML =
         `${variant.name} <span class="opp-elo-inline">(beta)</span>`;
       els.avatar.innerHTML = FishArt.avatar(variant);
+      els.eloWrap.classList.remove('hidden');
       els.eloBar.style.width = '100%';
       els.eloBar.className = 'elo-bar elo-mid';
       els.log.innerHTML = '';
@@ -837,11 +839,14 @@
   /* ---------- UI helpers ---------- */
 
   function updateEloUI() {
+    // Rule-based bots (DrawFish, WorstFish) don't play at a rating, so the
+    // strength bar would be meaningless for them.
+    els.eloWrap.classList.toggle('hidden', !!variant.eloLabel);
     const label = variant.eloLabel ? variant.eloLabel(vstate) : Math.round(vstate.elo);
     els.oppName.innerHTML =
       `${variant.name} <span class="opp-elo-inline">(${label})</span>`;
-    const span = ELO_MAX - 800; // display floor at 800 so the bar can visibly empty
-    const pct = Math.max(0, Math.min(1, (vstate.elo - 800) / span));
+    const span = ELO_MAX - ELO_FLOOR;
+    const pct = Math.max(0, Math.min(1, (vstate.elo - ELO_FLOOR) / span));
     els.eloBar.style.width = (pct * 100).toFixed(1) + '%';
     els.eloBar.className = 'elo-bar ' + (pct > 0.66 ? 'elo-high' : pct > 0.33 ? 'elo-mid' : 'elo-low');
   }

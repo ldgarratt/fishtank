@@ -32,10 +32,6 @@ function randomMoveProbability(effectiveElo) {
   return Math.min(0.12, ((250 - effectiveElo) / 250) * 0.12);
 }
 
-function clampUciElo(effectiveElo) {
-  return Math.max(ELO_MIN, Math.min(ELO_MAX, Math.round(effectiveElo)));
-}
-
 /*
  * Variant hook contract (all optional):
  *   init(state)                          -> called at game start
@@ -418,7 +414,7 @@ function pieceName(p) {
 // Export for node-based tests.
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
-    VARIANTS, randomMoveProbability, clampUciElo, clampElo, countInvaders,
+    VARIANTS, randomMoveProbability, clampElo, countInvaders,
     ELO_MIN, ELO_MAX, ELO_FLOOR,
   };
 }
