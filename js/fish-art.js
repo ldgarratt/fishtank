@@ -10,6 +10,9 @@
  */
 
 const FishArt = (() => {
+  // The fish's head sits at roughly this point of the Stockfish photo; the
+  // zoom is anchored here so props can be placed against a fixed landmark.
+  const HEAD_ORIGIN = '30% 75%';
   const svg = (vb, body, extra = '') =>
     `<svg viewBox="${vb}" xmlns="http://www.w3.org/2000/svg" ${extra}>${body}</svg>`;
 
@@ -212,7 +215,7 @@ const FishArt = (() => {
         `<g fill="none" stroke="#66bb6a" stroke-width="10" stroke-linecap="round" stroke-linejoin="round">
            <path d="M8 22l12 12L48 6"/><path d="M8 66l12 12L48 50"/>
          </g>
-         <g fill="none" stroke="#bdbdbd" stroke-width="10" stroke-linecap="round" opacity="0.5">
+         <g fill="none" stroke="#66bb6a" stroke-width="10" stroke-linecap="round" stroke-linejoin="round">
            <path d="M8 110l12 12L48 94"/>
          </g>`
       ),
@@ -250,6 +253,64 @@ const FishArt = (() => {
            <path d="M35 46l-6 12h12z"/></g>`
       ),
 
+    // Panic: alarm bell mid-ring.
+    alarmBell: () =>
+      svg(
+        '0 0 80 76',
+        `<path d="M40 6c14 0 22 10 22 24 0 16 4 22 10 28H8c6-6 10-12 10-28 0-14 8-24 22-24z" fill="#ffca28"/>
+         <circle cx="40" cy="4" r="6" fill="#ffb300"/>
+         <path d="M30 62h20a10 10 0 01-20 0z" fill="#ffb300"/>
+         <g stroke="#fff59d" stroke-width="5" stroke-linecap="round" fill="none">
+           <path d="M70 16l8-6M74 32l10-2"/><path d="M10 16L2 10M6 32l-10-2"/>
+         </g>`
+      ),
+
+    exclaim: () =>
+      svg(
+        '0 0 44 84',
+        `<g fill="#ef5350" stroke="#b71c1c" stroke-width="3" stroke-linejoin="round">
+           <path d="M22 2l10 52H12z"/><circle cx="22" cy="70" r="11"/>
+         </g>`
+      ),
+
+    // Tilt: a flipped table with pieces flying off it.
+    tableFlip: () =>
+      svg(
+        '0 0 110 90',
+        `<g transform="rotate(-28 55 55)">
+           <rect x="8" y="46" width="94" height="12" rx="4" fill="#8d6e63"/>
+           <rect x="18" y="58" width="9" height="28" rx="3" fill="#6d4c41"/>
+           <rect x="83" y="58" width="9" height="28" rx="3" fill="#6d4c41"/>
+         </g>
+         <g fill="#eceff1" stroke="#37474f" stroke-width="2.5">
+           <circle cx="24" cy="20" r="9"/><circle cx="58" cy="6" r="8"/><circle cx="88" cy="22" r="7"/>
+         </g>`
+      ),
+
+    // Shark: a mouthful of teeth.
+    sharkTeeth: () =>
+      svg(
+        '0 0 120 60',
+        `<path d="M4 10h112l-8 16-10-12-10 14-10-14-10 14-10-14-10 14-10-14-10 12z" fill="#fafafa"/>
+         <path d="M4 50h112l-8-16-10 12-10-14-10 14-10-14-10 14-10-14-10 14-10-12z" fill="#f5f5f5"/>
+         <path d="M4 10h112v4H4zM4 46h112v4H4z" fill="#c62828" opacity="0.7"/>`
+      ),
+
+    equalsBadge: () =>
+      svg(
+        '0 0 70 70',
+        `<circle cx="35" cy="35" r="32" fill="#eceff1" stroke="#90a4ae" stroke-width="4"/>
+         <g fill="#37474f"><rect x="16" y="24" width="38" height="8" rx="4"/>
+           <rect x="16" y="40" width="38" height="8" rx="4"/></g>`
+      ),
+
+    whiteFlag: () =>
+      svg(
+        '0 0 90 96',
+        `<rect x="8" y="2" width="7" height="92" rx="3" fill="#8d6e63"/>
+         <path d="M15 8h62c-8 12-8 22 0 34H15z" fill="#fafafa" stroke="#cfd8dc" stroke-width="3"/>`
+      ),
+
     tissueBox: () =>
       svg(
         '0 0 80 60',
@@ -263,9 +324,10 @@ const FishArt = (() => {
   /** Build the HTML for one variant's card art. */
   function cardArt(v) {
     const art = v.art || {};
+    // Zoom about the fish's head (~30%,75% of the photo) so that point stays
+    // put and prop coordinates below are stable.
     const fishStyle =
-      `transform:${art.transform || 'scale(1.55) rotate(-8deg)'};` +
-      `object-position:${art.focus || '32% 72%'};` +
+      `transform-origin:${HEAD_ORIGIN};transform:${art.transform || 'scale(1.45)'};` +
       `filter:${art.filter || 'none'}`;
     const props = (art.props || [])
       .map(([name, x, y, size, rot = 0]) => {
@@ -307,9 +369,10 @@ const FishArt = (() => {
   /** Avatar-sized version for the in-game bot card. */
   function avatar(v) {
     const art = v.art || {};
+    // Zoom about the fish's head (~30%,75% of the photo) so that point stays
+    // put and prop coordinates below are stable.
     const fishStyle =
-      `transform:${art.transform || 'scale(1.55) rotate(-8deg)'};` +
-      `object-position:${art.focus || '32% 72%'};` +
+      `transform-origin:${HEAD_ORIGIN};transform:${art.transform || 'scale(1.45)'};` +
       `filter:${art.filter || 'none'}`;
     const props = (art.props || [])
       .map(([name, x, y, size, rot = 0]) => {
