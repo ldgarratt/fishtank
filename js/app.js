@@ -131,6 +131,7 @@
     pendingPromo = null;
     reviewPly = null;
     reviewGame = null;
+    builtFlipped = null; // force a fresh board for the new game
     document.getElementById('promo').classList.add('hidden');
 
     els.picker.classList.add('hidden');
@@ -188,11 +189,86 @@
     return 'abcdefgh'[fileIdx] + (8 - rankIdx);
   }
 
-  function renderBoard() {
+  /**
+   * Build the 64 squares once. Re-creating them on every move made the browser
+   * re-decode all the piece SVGs, which showed up as a flicker; renderBoard()
+   * now only updates what actually changed.
+   */
+  let cellFor = new Map(); // square name -> element
+  let builtFlipped = null;
+
+  function buildBoard(flipped) {
     els.board.innerHTML = '';
+    cellFor = new Map();
+    for (let r = 0; r < 8; r++) {
+      for (let f = 0; f < 8; f++) {
+        const rr = flipped ? 7 - r : r;
+        const ff = flipped ? 7 - f : f;
+        const sq = squareName(ff, rr);
+        const cell = document.createElement('div');
+        cell.className = 'sq ' + ((rr + ff) % 2 === 0 ? 'light' : 'dark');
+        cell.dataset.sq = sq;
+        cell.dataset.piece = '';
+        cell.setAttribute('role', 'gridcell');
+        // Handlers read the square from the closure, and the element is reused
+        // for the whole game, so they are attached exactly once.
+        cell.addEventListener('click', () => onSquareClick(sq));
+        cell.addEventListener('pointerdown', (e) => {
+          const piece = game && reviewPly === null ? game.get(sq) : null;
+          if (piece && piece.color === playerColor) startDrag(e, sq, cell);
+        });
+        els.board.appendChild(cell);
+        cellFor.set(sq, cell);
+      }
+    }
+    builtFlipped = flipped;
+  }
+
+  function setPiece(cell, piece) {
+    const key = piece ? piece.color + piece.type : '';
+    if (cell.dataset.piece === key) return cell.querySelector('.piece-img');
+    cell.dataset.piece = key;
+    const existing = cell.querySelector('.piece-img');
+    if (!piece) {
+      if (existing) existing.remove();
+      return null;
+    }
+    const name = piece.color + piece.type.toUpperCase() + '.svg';
+    const img = existing || document.createElement('img');
+    img.className = 'piece-img';
+    img.alt = piece.color + piece.type;
+    img.draggable = false;
+    img.onerror = () => {
+      img.onerror = null;
+      img.src = CDN_PIECE_BASE + name;
+    };
+    img.src = PIECE_BASE + name;
+    if (!existing) cell.appendChild(img);
+    return img;
+  }
+
+  function setKingBadge(cell, piece, view) {
+    const wants = piece && piece.type === 'k' && variant && variant.kingLives;
+    let badge = cell.querySelector('.king-lives');
+    if (!wants) {
+      if (badge) badge.remove();
+      return;
+    }
+    const lives = variant.kingLives(vstate, view)[piece.color];
+    if (!badge) {
+      badge = document.createElement('span');
+      cell.appendChild(badge);
+    }
+    badge.className = 'king-lives' + (lives <= 1 ? ' king-lives-low' : '');
+    badge.textContent = lives;
+  }
+
+  function renderBoard() {
     // While reviewing, the board shows a past position instead of the live one.
     const view = reviewPly === null ? game : reviewGame;
     const flipped = playerColor === 'b';
+    if (builtFlipped !== flipped || cellFor.size !== 64) buildBoard(flipped);
+
     const legalTargets = new Set();
     if (selectedSquare && reviewPly === null) {
       for (const m of game.moves({ square: selectedSquare, verbose: true })) {
@@ -200,51 +276,31 @@
       }
     }
     const lastMove = view.history({ verbose: true }).slice(-1)[0] || null;
+    const inCheck = view.in_check();
+    const turn = view.turn();
 
-    for (let r = 0; r < 8; r++) {
-      for (let f = 0; f < 8; f++) {
-        const rr = flipped ? 7 - r : r;
-        const ff = flipped ? 7 - f : f;
-        const sq = squareName(ff, rr);
-        const cell = document.createElement('div');
-        cell.className = 'sq ' + (((rr + ff) % 2 === 0) ? 'light' : 'dark');
-        cell.dataset.sq = sq;
-        const piece = view.get(sq);
-        cell.setAttribute('role', 'gridcell');
-        cell.setAttribute('aria-label', sq + (piece ? ', ' + pieceLabel(piece) : ', empty'));
-        if (piece) {
-          const name = piece.color + piece.type.toUpperCase() + '.svg';
-          const img = document.createElement('img');
-          img.className = 'piece-img';
-          img.alt = piece.color + piece.type;
-          img.draggable = false;
-          img.src = PIECE_BASE + name;
-          img.onerror = () => {
-            img.onerror = null;
-            img.src = CDN_PIECE_BASE + name;
-          };
-          cell.appendChild(img);
-          if (piece.type === 'k' && variant && variant.kingLives) {
-            const lives = variant.kingLives(vstate, view)[piece.color];
-            const badge = document.createElement('span');
-            badge.className = 'king-lives' + (lives <= 1 ? ' king-lives-low' : '');
-            badge.textContent = lives;
-            cell.appendChild(badge);
-          }
-        }
-        if (selectedSquare === sq) cell.classList.add('selected');
-        if (premove && (premove.from === sq || premove.to === sq)) cell.classList.add('premove');
-        if (legalTargets.has(sq)) cell.classList.add(piece ? 'capture-target' : 'move-target');
-        if (lastMove && (lastMove.from === sq || lastMove.to === sq)) cell.classList.add('last-move');
-        if (piece && piece.type === 'k' && view.in_check() && piece.color === view.turn()) {
-          cell.classList.add('in-check');
-        }
-        cell.addEventListener('click', () => onSquareClick(sq));
-        if (piece && piece.color === playerColor && reviewPly === null) {
-          cell.addEventListener('pointerdown', (e) => startDrag(e, sq, cell));
-        }
-        els.board.appendChild(cell);
-      }
+    for (const [sq, cell] of cellFor) {
+      const piece = view.get(sq);
+      setPiece(cell, piece);
+      setKingBadge(cell, piece, view);
+      cell.setAttribute('aria-label', sq + (piece ? ', ' + pieceLabel(piece) : ', empty'));
+
+      cell.classList.toggle('selected', selectedSquare === sq);
+      cell.classList.toggle(
+        'premove',
+        !!premove && (premove.from === sq || premove.to === sq)
+      );
+      const target = legalTargets.has(sq);
+      cell.classList.toggle('move-target', target && !piece);
+      cell.classList.toggle('capture-target', target && !!piece);
+      cell.classList.toggle(
+        'last-move',
+        !!lastMove && (lastMove.from === sq || lastMove.to === sq)
+      );
+      cell.classList.toggle(
+        'in-check',
+        !!piece && piece.type === 'k' && inCheck && piece.color === turn
+      );
     }
   }
 
@@ -316,17 +372,10 @@
     if (e.button !== undefined && e.button !== 0) return;
     e.preventDefault();
 
-    // Select immediately and mark legal targets in place (no rebuild — that
-    // would destroy the elements mid-gesture).
+    // Squares are reused between renders now, so a normal render is safe
+    // mid-gesture and keeps the highlight logic in one place.
     selectedSquare = sq;
-    els.board.querySelectorAll('.sq').forEach((c) => {
-      c.classList.remove('selected', 'move-target', 'capture-target');
-    });
-    cell.classList.add('selected');
-    for (const m of game.moves({ square: sq, verbose: true })) {
-      const target = els.board.querySelector(`.sq[data-sq="${m.to}"]`);
-      if (target) target.classList.add(target.querySelector('.piece-img') ? 'capture-target' : 'move-target');
-    }
+    renderBoard();
 
     const pieceImg = cell.querySelector('.piece-img, .piece');
     let ghost = null;
