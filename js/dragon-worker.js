@@ -122,40 +122,212 @@ function describeMove(uci) {
   return { uci, san, captured };
 }
 
-/* ---------- search ---------- */
+/* ---------- search ----------
+ *
+ * Alpha-beta with iterative deepening, quiescence, MVV-LVA ordering and
+ * killer moves. The quiescence search is the important part: without it a
+ * fixed-depth search happily stops halfway through a trade, "wins" a queen,
+ * and never sees the recapture on the next ply.
+ */
 
-function evalWhite() {
-  const placement = board.fen().split(' ')[0];
+const MATE = 100000;
+const MAX_PLY = 64;
+const MAX_DEPTH = 24; // never reached in practice; time is the real limit
+const FILES = 'abcdefgh';
+
+/*
+ * Piece-square tables, written from White's point of view with rank 8 as the
+ * first row, so they read in the same order as a FEN. Black mirrors
+ * vertically. Values are the widely used "simplified evaluation" tables,
+ * with one addition: the dragon/amazon, which is strong enough that
+ * centralising it matters more than it does for a queen.
+ */
+const PST = {
+  p: [
+    0, 0, 0, 0, 0, 0, 0, 0,
+    50, 50, 50, 50, 50, 50, 50, 50,
+    10, 10, 20, 30, 30, 20, 10, 10,
+    5, 5, 10, 25, 25, 10, 5, 5,
+    0, 0, 0, 20, 20, 0, 0, 0,
+    5, -5, -10, 0, 0, -10, -5, 5,
+    5, 10, 10, -20, -20, 10, 10, 5,
+    0, 0, 0, 0, 0, 0, 0, 0,
+  ],
+  n: [
+    -50, -40, -30, -30, -30, -30, -40, -50,
+    -40, -20, 0, 5, 5, 0, -20, -40,
+    -30, 5, 10, 15, 15, 10, 5, -30,
+    -30, 0, 15, 20, 20, 15, 0, -30,
+    -30, 5, 15, 20, 20, 15, 5, -30,
+    -30, 0, 10, 15, 15, 10, 0, -30,
+    -40, -20, 0, 0, 0, 0, -20, -40,
+    -50, -40, -30, -30, -30, -30, -40, -50,
+  ],
+  b: [
+    -20, -10, -10, -10, -10, -10, -10, -20,
+    -10, 0, 0, 0, 0, 0, 0, -10,
+    -10, 0, 5, 10, 10, 5, 0, -10,
+    -10, 5, 5, 10, 10, 5, 5, -10,
+    -10, 0, 10, 10, 10, 10, 0, -10,
+    -10, 10, 10, 10, 10, 10, 10, -10,
+    -10, 5, 0, 0, 0, 0, 5, -10,
+    -20, -10, -10, -10, -10, -10, -10, -20,
+  ],
+  r: [
+    0, 0, 0, 0, 0, 0, 0, 0,
+    5, 10, 10, 10, 10, 10, 10, 5,
+    -5, 0, 0, 0, 0, 0, 0, -5,
+    -5, 0, 0, 0, 0, 0, 0, -5,
+    -5, 0, 0, 0, 0, 0, 0, -5,
+    -5, 0, 0, 0, 0, 0, 0, -5,
+    -5, 0, 0, 0, 0, 0, 0, -5,
+    0, 0, 0, 5, 5, 0, 0, 0,
+  ],
+  q: [
+    -20, -10, -10, -5, -5, -10, -10, -20,
+    -10, 0, 0, 0, 0, 0, 0, -10,
+    -10, 0, 5, 5, 5, 5, 0, -10,
+    -5, 0, 5, 5, 5, 5, 0, -5,
+    -5, 0, 5, 5, 5, 5, 0, -5,
+    -10, 0, 5, 5, 5, 5, 0, -10,
+    -10, 0, 0, 0, 0, 0, 0, -10,
+    -20, -10, -10, -5, -5, -10, -10, -20,
+  ],
+  a: [
+    -30, -20, -15, -10, -10, -15, -20, -30,
+    -20, -5, 0, 5, 5, 0, -5, -20,
+    -15, 0, 10, 15, 15, 10, 0, -15,
+    -10, 5, 15, 20, 20, 15, 5, -10,
+    -10, 5, 15, 20, 20, 15, 5, -10,
+    -15, 0, 10, 15, 15, 10, 0, -15,
+    -20, -5, 0, 5, 5, 0, -5, -20,
+    -30, -20, -15, -10, -10, -15, -20, -30,
+  ],
+  k: [
+    -30, -40, -40, -50, -50, -40, -40, -30,
+    -30, -40, -40, -50, -50, -40, -40, -30,
+    -30, -40, -40, -50, -50, -40, -40, -30,
+    -30, -40, -40, -50, -50, -40, -40, -30,
+    -20, -30, -30, -40, -40, -30, -30, -20,
+    -10, -20, -20, -20, -20, -20, -20, -10,
+    20, 20, 0, 0, 0, 0, 20, 20,
+    20, 30, 10, 0, 0, 10, 30, 20,
+  ],
+};
+
+/**
+ * One pass over the FEN: piece placement, material + positional score from
+ * White's point of view, and who is to move. Done once per node and reused
+ * for both evaluation and move ordering — board.fen() is the expensive call
+ * here, so calling it twice per node (as the old code did) cost real depth.
+ */
+function scan() {
+  const parts = board.fen().split(' ');
+  const rows = parts[0].split('/');
+  const at = Object.create(null);
   let score = 0;
-  for (const ch of placement) {
-    const v = VALS[ch.toLowerCase()];
-    if (v === undefined) continue;
-    score += ch === ch.toLowerCase() ? -v : v;
+  for (let row = 0; row < 8; row++) {
+    let file = 0;
+    for (const ch of rows[row]) {
+      if (ch >= '1' && ch <= '9') {
+        file += +ch;
+        continue;
+      }
+      const lower = ch.toLowerCase();
+      at[FILES[file] + (8 - row)] = ch;
+      const val = VALS[lower];
+      if (val !== undefined) {
+        const white = ch !== lower;
+        const table = PST[lower];
+        // Black reads the same table from the opposite end of the board.
+        const pos = table ? table[(white ? row : 7 - row) * 8 + file] : 0;
+        score += white ? val + pos : -(val + pos);
+      }
+      file++;
+    }
   }
-  return score;
+  return { at, score, whiteToMove: parts[1] === 'w' };
 }
 
 let nodeCount = 0;
 let deadline = 0;
 let aborted = false;
+let rootBest = null;
+let lastDepth = 0;
+const killers = Array.from({ length: MAX_PLY + 1 }, () => [null, null]);
 
-function negamax(depth, alpha, beta, sign) {
-  if ((++nodeCount & 63) === 0 && Date.now() > deadline) {
+function outOfTime() {
+  // ffish calls dominate the cost of a node, so checking often is cheap.
+  return (++nodeCount & 31) === 0 && Date.now() > deadline;
+}
+
+function pieceValueAt(at, sq) {
+  const ch = at[sq];
+  return ch ? VALS[ch.toLowerCase()] || 0 : 0;
+}
+
+/**
+ * Most Valuable Victim / Least Valuable Attacker, then killers, then the
+ * rest. Good ordering is what makes alpha-beta actually prune.
+ */
+function order(moves, info, ply) {
+  const killer = killers[ply];
+  const rank = new Map();
+  for (const m of moves) {
+    const victim = pieceValueAt(info.at, m.slice(2, 4));
+    let s;
+    if (victim) s = 1e6 + victim * 16 - pieceValueAt(info.at, m.slice(0, 2));
+    else if (m === killer[0]) s = 9e5;
+    else if (m === killer[1]) s = 9e5 - 1;
+    else s = m.length > 4 ? 8e5 : 0; // promotions before quiet moves
+    rank.set(m, s);
+  }
+  moves.sort((a, b) => rank.get(b) - rank.get(a));
+}
+
+function rememberKiller(ply, move) {
+  const k = killers[ply];
+  if (k[0] === move) return;
+  k[1] = k[0];
+  k[0] = move;
+}
+
+/**
+ * Search only forcing moves until the position is quiet, so the evaluation is
+ * never taken in the middle of an exchange.
+ */
+function quiesce(alpha, beta, ply, movesIn, inChkIn) {
+  if (outOfTime()) {
     aborted = true;
     return 0;
   }
-  const moves = legalList('legalMoves');
-  if (moves.length === 0) return inCheckNow() ? -100000 + (100 - depth) : 0;
-  if (depth === 0) return sign * evalWhite();
+  const moves = movesIn || legalList('legalMoves');
+  const inChk = inChkIn === undefined ? inCheckNow() : inChkIn;
+  if (!moves.length) return inChk ? -(MATE - ply) : 0;
 
-  // Captures first for better pruning.
-  const occ = occupiedSet(board.fen());
-  moves.sort((m1, m2) => occ.has(m2.slice(2, 4)) - occ.has(m1.slice(2, 4)));
+  const info = scan();
+  const standPat = info.whiteToMove ? info.score : -info.score;
+  if (ply >= MAX_PLY) return standPat;
 
-  let best = -Infinity;
-  for (const m of moves) {
+  if (!inChk) {
+    if (standPat >= beta) return standPat;
+    if (standPat > alpha) alpha = standPat;
+  }
+
+  // Out of check, every move is a candidate escape; otherwise only captures.
+  const candidates = inChk ? moves : moves.filter((m) => info.at[m.slice(2, 4)]);
+  if (!candidates.length) return standPat;
+  order(candidates, info, ply);
+
+  let best = inChk ? -Infinity : standPat;
+  for (const m of candidates) {
+    // Delta pruning: skip captures that cannot drag the score up to alpha
+    // even if they win the piece outright.
+    if (!inChk && standPat + pieceValueAt(info.at, m.slice(2, 4)) + 200 < alpha) {
+      continue;
+    }
     board.push(m);
-    const score = -negamax(depth - 1, -beta, -alpha, -sign);
+    const score = -quiesce(-beta, -alpha, ply + 1);
     board.pop();
     if (aborted) return 0;
     if (score > best) best = score;
@@ -165,32 +337,74 @@ function negamax(depth, alpha, beta, sign) {
   return best;
 }
 
+function negamax(depth, alpha, beta, ply) {
+  if (outOfTime()) {
+    aborted = true;
+    return 0;
+  }
+  const moves = legalList('legalMoves');
+  if (!moves.length) {
+    // Prefer mating sooner and being mated later.
+    return inCheckNow() ? -(MATE - ply) : 0;
+  }
+  if (depth <= 0) return quiesce(alpha, beta, ply, moves, inCheckNow());
+
+  const info = scan();
+  order(moves, info, ply);
+  if (ply === 0 && rootBest) {
+    // Search the previous iteration's best move first.
+    const i = moves.indexOf(rootBest);
+    if (i > 0) moves.unshift(moves.splice(i, 1)[0]);
+  }
+
+  let best = -Infinity;
+  let bestMove = null;
+  for (const m of moves) {
+    board.push(m);
+    const score = -negamax(depth - 1, -beta, -alpha, ply + 1);
+    board.pop();
+    if (aborted) return 0;
+    if (score > best) {
+      best = score;
+      bestMove = m;
+    }
+    if (best > alpha) alpha = best;
+    if (alpha >= beta) {
+      if (!info.at[m.slice(2, 4)]) rememberKiller(ply, m);
+      break;
+    }
+  }
+  if (ply === 0 && bestMove) rootBest = bestMove;
+  return best;
+}
+
 function think() {
   const moves = legalList('legalMoves');
   if (!moves.length) return null;
-  const sign = board.fen().split(' ')[1] === 'w' ? 1 : -1;
+  if (moves.length === 1) return moves[0];
+
   deadline = Date.now() + THINK_MS;
   nodeCount = 0;
-  let bestMove = moves[Math.floor(Math.random() * moves.length)];
+  rootBest = null;
+  lastDepth = 0;
+  let best = moves[0];
 
-  for (let depth = 1; depth <= 3; depth++) {
+  for (let depth = 1; depth <= MAX_DEPTH; depth++) {
     aborted = false;
-    let bestScore = -Infinity;
-    let bestAtDepth = null;
-    for (const m of moves) {
-      board.push(m);
-      const score = -negamax(depth - 1, -Infinity, Infinity, -sign) + Math.random() * 10;
-      board.pop();
-      if (aborted) break;
-      if (score > bestScore) {
-        bestScore = score;
-        bestAtDepth = m;
-      }
+    for (const k of killers) {
+      k[0] = null;
+      k[1] = null;
     }
+    negamax(depth, -Infinity, Infinity, 0);
+    // A half-finished iteration has only looked at some root moves, so its
+    // answer is discarded and the last complete depth stands.
     if (aborted) break;
-    if (bestAtDepth) bestMove = bestAtDepth;
+    if (rootBest) best = rootBest;
+    lastDepth = depth;
+    // No point starting a depth we clearly cannot finish.
+    if (Date.now() > deadline - THINK_MS / 6) break;
   }
-  return bestMove;
+  return best;
 }
 
 /* ---------- message handling ---------- */

@@ -677,6 +677,154 @@ async function testDrawFish() {
   }
 }
 
+console.log('DragonFish search');
+{
+  // The worker is a classic worker script, so it is loaded into a sandbox with
+  // stubs for the worker globals and a scripted mock board standing in for
+  // ffish. The mock is a small tree of positions with hand-written FENs, which
+  // is enough to test the search without the 6 MB wasm binary.
+  const vm = require('vm');
+  const fs = require('fs');
+  const src = fs.readFileSync(
+    path.join(__dirname, '..', 'js', 'dragon-worker.js'),
+    'utf8'
+  );
+
+  const ctx = {
+    self: {
+      postMessage() {},
+      importScripts() {
+        throw new Error('no ffish in tests');
+      },
+    },
+    Date,
+    Math,
+    Object,
+    Array,
+    console,
+  };
+  ctx.self.self = ctx.self;
+  ctx.importScripts = ctx.self.importScripts;
+  ctx.postMessage = ctx.self.postMessage;
+  vm.createContext(ctx);
+  // Expose the module-scoped internals; `let` bindings never reach the global.
+  vm.runInContext(
+    src +
+      '\nself.__test = {' +
+      '  setBoard: (b) => { board = b; },' +
+      '  scan: () => scan(),' +
+      '  order: (m, i, p) => order(m, i, p),' +
+      '  PST, VALS,' +
+      '  search: (depth) => {' +
+      '    deadline = Date.now() + 30000; aborted = false;' +
+      '    nodeCount = 0; rootBest = null;' +
+      '    const s = negamax(depth, -Infinity, Infinity, 0);' +
+      '    return { move: rootBest, score: s, aborted };' +
+      '  },' +
+      '};',
+    ctx
+  );
+  const T = ctx.self.__test;
+
+  for (const [name, table] of Object.entries(T.PST)) {
+    assert(table.length === 64, `${name} piece-square table covers 64 squares`);
+  }
+  assert(
+    Object.keys(T.PST).every((k) => T.VALS[k] !== undefined),
+    'every piece-square table belongs to a real piece'
+  );
+  // Tables must not favour one wing over the other.
+  const asymmetric = Object.entries(T.PST).filter(([, t]) => {
+    for (let r = 0; r < 8; r++) {
+      for (let f = 0; f < 4; f++) if (t[r * 8 + f] !== t[r * 8 + (7 - f)]) return true;
+    }
+    return false;
+  });
+  assert(asymmetric.length === 0,
+    'piece-square tables are left-right symmetric' +
+    (asymmetric.length ? ' (offenders: ' + asymmetric.map((x) => x[0]) + ')' : ''));
+
+  /* A scripted position tree. White can grab a knight with its dragon, but the
+   * dragon is then taken by a pawn — the classic error a search without a
+   * quiescence phase makes, because it stops counting after the first capture. */
+  const TREE = {
+    root: {
+      fen: '4k3/8/6p1/7n/8/8/P7/3AK3 w - - 0 1',
+      moves: { d1h5: 'capB', a2a3: 'quietB' },
+    },
+    // Dragon has taken on h5; Black to move.
+    capB: {
+      fen: '4k3/8/6p1/7A/8/8/P7/4K3 b - - 0 1',
+      moves: { g6h5: 'recapW', e8d8: 'keptW' },
+    },
+    // ...gxh5: White is a dragon down for a knight.
+    recapW: { fen: '4k3/8/8/7p/8/8/P7/4K3 w - - 0 2', moves: { e1d1: 'recapB' } },
+    recapB: { fen: '4k3/8/8/7p/8/8/P7/3K4 b - - 1 2', moves: { e8d8: 'recapW2' } },
+    recapW2: { fen: '3k4/8/8/7p/8/8/P7/3K4 w - - 2 3', moves: { d1e1: 'recapB2' } },
+    recapB2: { fen: '3k4/8/8/7p/8/8/P7/4K3 b - - 3 3', moves: { d8e8: 'recapW' } },
+    // Black declines the recapture: White keeps the extra piece.
+    keptW: { fen: '3k4/8/6p1/7A/8/8/P7/4K3 w - - 1 2', moves: { e1d1: 'keptB' } },
+    keptB: { fen: '3k4/8/6p1/7A/8/8/P7/3K4 b - - 2 3', moves: { d8e8: 'keptW' } },
+    // The quiet alternative: nothing is traded, White stays a piece up.
+    quietB: { fen: '4k3/8/6p1/7n/8/P7/8/3AK3 b - - 0 1', moves: { e8d8: 'quietW' } },
+    quietW: { fen: '3k4/8/6p1/7n/8/P7/8/3AK3 w - - 1 2', moves: { e1f1: 'quietB2' } },
+    quietB2: { fen: '3k4/8/6p1/7n/8/P7/8/3A1K2 b - - 2 2', moves: { d8e8: 'quietW2' } },
+    quietW2: { fen: '4k3/8/6p1/7n/8/P7/8/3A1K2 w - - 3 3', moves: { f1e1: 'quietB' } },
+  };
+
+  let cur = 'root';
+  const stack = [];
+  const mock = {
+    fen: () => TREE[cur].fen,
+    legalMoves: () => Object.keys(TREE[cur].moves).join(' '),
+    legalMovesSan: () => Object.keys(TREE[cur].moves).join(' '),
+    isCheck: () => false,
+    push(m) {
+      stack.push(cur);
+      cur = TREE[cur].moves[m];
+    },
+    pop() {
+      cur = stack.pop();
+    },
+  };
+  T.setBoard(mock);
+
+  const scoreOf = (id) => {
+    cur = id;
+    return T.scan().score;
+  };
+  const afterCapture = scoreOf('capB');
+  const afterQuiet = scoreOf('quietB');
+  const afterRecapture = scoreOf('recapW');
+  cur = 'root';
+
+  // This is precisely the trap: counting material one ply after the capture
+  // makes the losing move look like the best one on the board.
+  assert(afterCapture > afterQuiet,
+    'grabbing the knight looks best if you stop counting there (' +
+    afterCapture + ' vs ' + afterQuiet + ')');
+  assert(afterRecapture < afterQuiet - 500,
+    'but after the recapture White is much worse (' + afterRecapture + ')');
+
+  const d1 = T.search(1);
+  assert(cur === 'root', 'the search leaves the board where it found it');
+  assert(d1.move === 'a2a3',
+    'quiescence sees the recapture and declines the piece grab (played ' +
+    d1.move + ')');
+  const d3 = T.search(3);
+  assert(d3.move === 'a2a3', 'still declines it when searching deeper');
+  assert(!d3.aborted, 'a tiny tree finishes well inside the time budget');
+
+  // Move ordering: try the most valuable victim first.
+  cur = 'root';
+  const info = T.scan();
+  assert(info.whiteToMove === true, 'scan reads the side to move from the FEN');
+  assert(info.at.d1 === 'A' && info.at.h5 === 'n', 'scan maps pieces to squares');
+  const ordered = ['a2a3', 'd1h5'];
+  T.order(ordered, info, 0);
+  assert(ordered[0] === 'd1h5', 'captures are searched before quiet moves');
+}
+
 // Async suites run last, then the overall result is reported.
 (async () => {
   await testDrawFish();

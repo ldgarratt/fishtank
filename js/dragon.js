@@ -85,7 +85,7 @@ const DragonMode = (() => {
     let usedFull = false;
     try {
       if (await FairyEngine.ready()) {
-        const uci = await FairyEngine.bestMove(snapshot.fen, 900);
+        const uci = await FairyEngine.bestMove(snapshot.fen, 1400);
         if (uci && snapshot.moves.indexOf(uci) !== -1) {
           usedFull = true;
           announceBrain(true);

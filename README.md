@@ -153,7 +153,11 @@ requires cross-origin isolation; on GitHub Pages this is enabled by
 [coi-serviceworker](https://github.com/gzuidhof/coi-serviceworker) (vendored
 at deploy time — it may trigger one automatic page reload on first visit).
 If isolation isn't available, DragonFish silently falls back to a built-in
-lite alpha-beta search; the feed tells you which brain is active.
+alpha-beta search; the feed tells you which brain is active. That fallback is
+iterative-deepening alpha-beta with a quiescence search, MVV-LVA move
+ordering, killer moves and piece-square tables — the quiescence part being
+what stops it grabbing a defended piece and only noticing the recapture a
+move later.
 
 ## Publishing / deployment
 
