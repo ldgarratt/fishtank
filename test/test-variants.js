@@ -724,6 +724,106 @@ async function testDrawFish() {
   }
 }
 
+console.log('Best-move arrows');
+{
+  // The geometry helpers are pure, so they are pulled out of app.js and run
+  // directly rather than through a DOM.
+  const fs = require('fs');
+  const src = fs.readFileSync(path.join(__dirname, '..', 'js', 'app.js'), 'utf8');
+  const grab = (name) => {
+    const start = src.indexOf(`function ${name}(`);
+    if (start < 0) throw new Error(`${name} not found in app.js`);
+    let depth = 0;
+    let i = src.indexOf('{', start);
+    const from = i;
+    for (; i < src.length; i++) {
+      if (src[i] === '{') depth++;
+      else if (src[i] === '}' && --depth === 0) break;
+    }
+    return src.slice(start, i + 1) && src.slice(from, i + 1);
+  };
+  // eslint-disable-next-line no-new-func
+  const squareCentre = new Function(
+    'sq', 'flipped', grab('squareCentre').replace(/^\{|\}$/g, '')
+  );
+  const arrowPoints = new Function(
+    'from', 'to', 'flipped',
+    'const squareCentre = ' +
+      'function (sq, flipped) ' + grab('squareCentre') + ';' +
+      grab('arrowPoints').replace(/^\{|\}$/g, '')
+  );
+
+  // a8 is the top-left square when White is at the bottom.
+  let c = squareCentre('a8', false);
+  assert(c.x === 0.5 && c.y === 0.5, 'a8 is the top-left square for White');
+  c = squareCentre('h1', false);
+  assert(c.x === 7.5 && c.y === 7.5, 'h1 is the bottom-right square for White');
+  // Flipping the board must mirror both axes, not just one.
+  c = squareCentre('a8', true);
+  assert(c.x === 7.5 && c.y === 7.5, 'a8 is bottom-right when playing Black');
+  c = squareCentre('e1', false);
+  const cf = squareCentre('e1', true);
+  // Centres sit at col + 0.5, so the mirror of x is 8 - x, not 7 - x.
+  assert(cf.x === 8 - c.x && cf.y === 8 - c.y, 'flipping mirrors both axes');
+
+  const parse = (s) => s.split(' ').map((p) => p.split(',').map(Number));
+  const e2e4 = parse(arrowPoints('e2', 'e4', false));
+  assert(e2e4.length === 7, 'an arrow is a 7-point polygon (shaft plus head)');
+  assert(e2e4.every((p) => p.every((n) => Number.isFinite(n))),
+    'every arrow coordinate is a real number');
+
+  // e2 -> e4 is straight up the board: constant x, and the tip above the tail.
+  const xs = e2e4.map((p) => p[0]);
+  const centreX = squareCentre('e2', false).x;
+  assert(Math.max(...xs) - Math.min(...xs) < 0.6,
+    'a vertical arrow stays within its file');
+  const tip = e2e4[3]; // the point of the head
+  assert(Math.abs(tip[0] - centreX) < 1e-9, 'the tip is centred on the file');
+  // e2->e4 travels up the board, so "stopping short" means a larger y. Compare
+  // distances from the origin rather than raw coordinates, which flip sign.
+  const orig = squareCentre('e2', false);
+  const dest = squareCentre('e4', false);
+  const travelled = Math.hypot(tip[0] - orig.x, tip[1] - orig.y);
+  const full = Math.hypot(dest.x - orig.x, dest.y - orig.y);
+  assert(travelled < full, 'the tip stops short of the target square centre');
+  assert(full - travelled < 0.2, 'but only just short of it');
+
+  // Knight moves are diagonal-ish; the arrow must still point the right way.
+  const g1f3 = parse(arrowPoints('g1', 'f3', false));
+  const from = squareCentre('g1', false);
+  const to = squareCentre('f3', false);
+  const tipN = g1f3[3];
+  assert(
+    Math.hypot(tipN[0] - to.x, tipN[1] - to.y) <
+      Math.hypot(tipN[0] - from.x, tipN[1] - from.y),
+    'the head points at the destination, not the origin'
+  );
+
+  assert(arrowPoints('e2', 'e2', false) === null, 'a null move draws nothing');
+
+  // Flipping the board must not change the arrow's shape, only its position.
+  const spread = (pts) => {
+    const p = parse(pts);
+    return Math.hypot(
+      Math.max(...p.map((q) => q[0])) - Math.min(...p.map((q) => q[0])),
+      Math.max(...p.map((q) => q[1])) - Math.min(...p.map((q) => q[1]))
+    );
+  };
+  assert(
+    Math.abs(spread(arrowPoints('e2', 'e4', false)) -
+             spread(arrowPoints('e2', 'e4', true))) < 1e-9,
+    'flipping the board does not distort the arrow'
+  );
+
+  // A one-square arrow still has to fit its head in without inverting.
+  const short = parse(arrowPoints('e2', 'e3', false));
+  assert(short.every((p) => p.every((n) => Number.isFinite(n))),
+    'a one-square arrow is still well formed');
+
+  assert(/analysisReport = null/.test(src), 'a new game clears the analysis');
+  assert(/renderArrows\(\);/.test(src), 'the board render draws the arrows');
+}
+
 console.log('Click-to-move guard');
 {
   // A tap fires pointerdown, pointerup and then click. Both boards select on

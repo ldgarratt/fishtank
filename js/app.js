@@ -35,6 +35,7 @@
     btnPgn: document.getElementById('btn-pgn'),
     btnAnalyse: document.getElementById('btn-analyse'),
     analysis: document.getElementById('analysis'),
+    arrows: document.getElementById('arrows'),
     sideSelect: document.getElementById('side-select'),
   };
 
@@ -54,6 +55,7 @@
   let reviewPly = null; // null = live position; otherwise plies shown
   let reviewGame = null; // chess.js replay used while reviewing
   let liveStatus = ''; // status text to restore when leaving review
+  let analysisReport = null; // last completed analysis, drives the arrows
 
   /* ---------- variant picker ---------- */
 
@@ -131,6 +133,7 @@
     pendingPromo = null;
     reviewPly = null;
     reviewGame = null;
+    analysisReport = null;
     builtFlipped = null; // force a fresh board for the new game
     document.getElementById('promo').classList.add('hidden');
 
@@ -264,6 +267,84 @@
     badge.textContent = lives;
   }
 
+  /* ---------- best-move arrows ---------- */
+
+  /**
+   * Centre of a square in board units, where the board is 8x8 and the origin
+   * is the top-left square as currently displayed.
+   */
+  function squareCentre(sq, flipped) {
+    let col = 'abcdefgh'.indexOf(sq[0]);
+    let row = 8 - parseInt(sq[1], 10);
+    if (flipped) {
+      col = 7 - col;
+      row = 7 - row;
+    }
+    return { x: col + 0.5, y: row + 0.5 };
+  }
+
+  /** An arrow as a single polygon: a shaft with a triangular head. */
+  function arrowPoints(from, to, flipped) {
+    const a = squareCentre(from, flipped);
+    const b = squareCentre(to, flipped);
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const len = Math.hypot(dx, dy);
+    if (!len) return null;
+    const ux = dx / len;
+    const uy = dy / len;
+    const px = -uy; // unit vector perpendicular to the arrow
+    const py = ux;
+
+    const HEAD = 0.34; // length of the head
+    const HALF_HEAD = 0.28;
+    const HALF_SHAFT = 0.085;
+    const TAIL = 0.28; // start clear of the piece being moved
+    const TIP = 0.06; // stop just short of the target square's centre
+
+    const tail = len - TAIL <= HEAD ? Math.max(0, len - HEAD - 0.02) : TAIL;
+    const tipLen = len - TIP;
+    const headLen = Math.max(tail, tipLen - HEAD);
+    const at = (d, side) => ({
+      x: a.x + ux * d + px * side,
+      y: a.y + uy * d + py * side,
+    });
+    return [
+      at(tail, HALF_SHAFT),
+      at(headLen, HALF_SHAFT),
+      at(headLen, HALF_HEAD),
+      at(tipLen, 0),
+      at(headLen, -HALF_HEAD),
+      at(headLen, -HALF_SHAFT),
+      at(tail, -HALF_SHAFT),
+    ]
+      .map((p) => `${p.x.toFixed(3)},${p.y.toFixed(3)}`)
+      .join(' ');
+  }
+
+  /**
+   * While reviewing an analysed game, show the move Stockfish preferred in the
+   * position on screen — the same cue lichess draws. Nothing is drawn at the
+   * live position, or where the move played was already the best one.
+   */
+  function renderArrows() {
+    if (!els.arrows) return;
+    els.arrows.innerHTML = '';
+    if (!analysisReport || reviewPly === null || !game) return;
+    const entry = analysisReport.moves[reviewPly];
+    if (!entry || !entry.bestUci) return;
+    const pts = arrowPoints(
+      entry.bestUci.slice(0, 2),
+      entry.bestUci.slice(2, 4),
+      playerColor === 'b'
+    );
+    if (!pts) return;
+    const poly = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+    poly.setAttribute('points', pts);
+    poly.setAttribute('class', 'arrow-best');
+    els.arrows.appendChild(poly);
+  }
+
   function renderBoard() {
     // While reviewing, the board shows a past position instead of the live one.
     const view = reviewPly === null ? game : reviewGame;
@@ -303,6 +384,7 @@
         !!piece && piece.type === 'k' && inCheck && piece.color === turn
       );
     }
+    renderArrows();
   }
 
   /* ---------- interaction ---------- */
@@ -800,7 +882,13 @@
       const report = await Analysis.run(engine, history, (done, total) => {
         bar.style.width = Math.round((done / total) * 100) + '%';
       });
+      analysisReport = report;
       renderAnalysis(report);
+      // Land on the first real mistake so the arrow has something to show.
+      const first = report.moves.find((m) => m.cls.key === 'blunder')
+        || report.moves.find((m) => m.cls.key === 'mistake')
+        || report.moves.find((m) => m.bestUci);
+      if (first) goToPly(first.ply);
     } catch (err) {
       els.analysis.innerHTML = '<h2>Analysis</h2><div class="an-note">Analysis failed: ' + err + '</div>';
     } finally {
@@ -845,7 +933,7 @@
       .filter((m) => m.cls.key === 'blunder' || m.cls.key === 'mistake' || m.cls.key === 'inaccuracy')
       .map(
         (m) =>
-          `<div class="an-move ${m.cls.key}">` +
+          `<div class="an-move ${m.cls.key}" data-ply="${m.ply}" role="button" tabindex="0">` +
           `<span class="an-badge">${m.cls.icon}</span>` +
           `<span class="an-san">${m.n}${m.color === 'w' ? '.' : '...'} ${m.san}</span>` +
           `<span class="an-loss">−${(m.loss / 100).toFixed(1)}</span>` +
@@ -859,8 +947,21 @@
       `<div class="an-summary">${row('You', me)}${row(variant.name, them)}</div>` +
       evalGraph(report.graph) +
       (notable
-        ? `<div class="an-moves">${notable}</div>`
+        ? `<div class="an-moves">${notable}</div>` +
+          '<div class="an-note">Click a move to see it. The green arrow is what ' +
+          'Stockfish would have played; ← → step through the game.</div>'
         : '<div class="an-note">No mistakes worth mentioning. Clean game.</div>');
+
+    els.analysis.querySelectorAll('.an-move').forEach((row) => {
+      const jump = () => goToPly(parseInt(row.dataset.ply, 10));
+      row.addEventListener('click', jump);
+      row.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          jump();
+        }
+      });
+    });
   }
 
   /* ---------- undo ---------- */

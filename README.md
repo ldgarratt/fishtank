@@ -61,7 +61,13 @@ a move) returns to the present.
   and reports accuracy percentages, average centipawn loss, and
   every inaccuracy, mistake, and blunder with the move that was better,
   plus an evaluation graph. Same method lichess and chess.com use: each move
-  is scored by how much winning chance it gave away.
+  is scored by how much winning chance it gave away, and the game accuracy
+  combines a volatility-weighted mean with a harmonic mean so that a few
+  disasters aren't averaged away by a pile of obvious recaptures.
+
+  Click any listed mistake to jump to it. A green arrow on the board shows the
+  move Stockfish would have played instead, and the arrow keys walk forwards
+  and backwards from there.
 
 ## How the strength adjustment works
 

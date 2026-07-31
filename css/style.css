@@ -242,6 +242,14 @@ main { flex: 1; width: 100%; max-width: 1280px; margin: 0 auto; padding: 12px 24
 .board.reviewing { filter: brightness(0.82) saturate(0.85); }
 
 /* Promotion picker overlay */
+/* Best-move arrows sit above the pieces but never eat clicks. */
+.arrows {
+  position: absolute; inset: 0; z-index: 4;
+  pointer-events: none;
+  overflow: visible;
+}
+.arrows .arrow-best { fill: rgba(90, 190, 120, 0.8); }
+
 .promo {
   position: absolute; inset: 0; z-index: 5;
   display: flex; align-items: center; justify-content: center;
@@ -345,6 +353,11 @@ main { flex: 1; width: 100%; max-width: 1280px; margin: 0 auto; padding: 12px 24
   display: flex; align-items: baseline; gap: 8px;
   padding: 5px 8px; border-radius: 8px; font-size: 0.85rem;
   border-left: 3px solid transparent;
+  cursor: pointer;
+}
+.an-move:hover, .an-move:focus-visible {
+  background: rgba(255, 255, 255, 0.09);
+  outline: none;
 }
 .an-move.blunder { border-left-color: #ff7b72; background: rgba(255, 123, 114, 0.09); }
 .an-move.mistake { border-left-color: #ffb74d; background: rgba(255, 183, 77, 0.08); }

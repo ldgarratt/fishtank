@@ -13,7 +13,7 @@
   <meta property="og:type" content="website" />
   <meta property="og:url" content="https://ldgarratt.github.io/fishtank/" />
   <meta property="og:image" content="https://ldgarratt.github.io/fishtank/img/stockfish.png" />
-  <link rel="stylesheet" href="css/style.css?v=42" />
+  <link rel="stylesheet" href="css/style.css?v=43" />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80'>🐟</text></svg>" />
 </head>
 <body>
@@ -59,6 +59,8 @@
       <div class="board-col">
         <div class="board-wrap">
           <div id="board" class="board" role="grid" aria-label="Chess board"></div>
+          <!-- Best-move arrows drawn over the board during analysis review. -->
+          <svg id="arrows" class="arrows" viewBox="0 0 8 8" preserveAspectRatio="none" aria-hidden="true"></svg>
           <div id="promo" class="promo hidden"></div>
         </div>
         <div id="status" class="status" role="status" aria-live="polite"></div>
@@ -113,16 +115,16 @@
         ['vendor/chess.js',
          'https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js',
          'https://cdn.jsdelivr.net/npm/chess.js@0.10.3/chess.js'],
-        ['js/variants.js?v=42'],
-        ['js/engine.js?v=42'],
-        ['js/sound.js?v=42'],
-        ['js/analysis.js?v=42'],
-        ['js/maia-encode.js?v=42'],
-        ['js/maia.js?v=42'],
-        ['js/fish-art.js?v=42'],
-        ['js/fairy-engine.js?v=42'],
-        ['js/dragon.js?v=42'],
-        ['js/app.js?v=42'],
+        ['js/variants.js?v=43'],
+        ['js/engine.js?v=43'],
+        ['js/sound.js?v=43'],
+        ['js/analysis.js?v=43'],
+        ['js/maia-encode.js?v=43'],
+        ['js/maia.js?v=43'],
+        ['js/fish-art.js?v=43'],
+        ['js/fairy-engine.js?v=43'],
+        ['js/dragon.js?v=43'],
+        ['js/app.js?v=43'],
       ]);
     })();
   </script>

@@ -154,15 +154,23 @@ const Analysis = (() => {
       counts[mover][cls.key] += 1;
       lossTotals[mover] += loss;
 
-      const bestSan = uciToSan(fens[i], scored[i].best);
+      const bestUci = scored[i].best;
+      const bestSan = uciToSan(fens[i], bestUci);
+      const wasBest = !bestSan || bestSan === pgnMoves[i].san;
       moves.push({
         n: Math.floor(i / 2) + 1,
+        // Plies played before this move — the position the board shows when
+        // you step back to it, and the index this entry is looked up by.
+        ply: i,
         color: mover,
         san: pgnMoves[i].san,
         loss,
         cls,
         evalAfter: mover === 'w' ? after : -after, // White's perspective
-        best: bestSan && bestSan !== pgnMoves[i].san ? bestSan : null,
+        best: wasBest ? null : bestSan,
+        // Kept in UCI too so the board can draw it as an arrow.
+        bestUci: wasBest ? null : bestUci,
+        playedUci: pgnMoves[i].from + pgnMoves[i].to + (pgnMoves[i].promotion || ''),
       });
       graph.push(mover === 'w' ? after : -after);
     }
